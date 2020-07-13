@@ -10,6 +10,7 @@ from gantools.data.transformation import tf_flip_slices, tf_patch2img
 from gantools.plot.plot_summary import PlotSummaryPlot
 from copy import deepcopy
 
+
 class BaseGAN(BaseNet):
     """Abstract class for the model."""
     def __init__(self, params={}, name='BaseGAN'):
@@ -18,14 +19,11 @@ class BaseGAN(BaseNet):
         self.D_fake = None
         self._D_loss = None
         self._G_loss = None
+        self._E_loss = None
         self._summary = None
         self._constraints = []
         super().__init__(params=params, name=name)
-        self._loss = (self.D_loss, self.G_loss)
-
-    @property
-    def D_loss(self):
-        return self._D_loss
+        self._loss = (self.D_loss, self.G_loss, self.E_loss)
 
     @property
     def D_loss(self):
@@ -34,6 +32,10 @@ class BaseGAN(BaseNet):
     @property
     def G_loss(self):
         return self._G_loss
+
+    @property
+    def E_loss(self):
+        return self._E_loss
 
     @property
     def summary(self):
@@ -46,18 +48,23 @@ class BaseGAN(BaseNet):
     @property
     def constraints(self):
         return self._constraints
-    
 
     def sample_latent(self, N):
         raise NotImplementedError("This is a an abstract class.")
 
 
-class WGAN(BaseGAN):
+class BiWGAN(BaseGAN):
+    def __init__(self, params, name='wgan'):
+        self._E_loss = None
+        super().__init__(params=params, name=name)
+        self._loss = (self.D_loss, self.G_loss, self.E_loss)
+        self._summary = tf.summary.merge(tf.get_collection("model"))
+
     def default_params(self):
         d_params = deepcopy(super().default_params())
         d_params['shape'] = [16, 16, 1] # Shape of the image
         d_params['prior_distribution'] = 'gaussian' # prior distribution
-        d_params['gamma_gp'] = 10 
+        d_params['gamma_gp'] = 10
         d_params['loss_type'] = 'wasserstein'  # 'hinge' or 'wasserstein'
 
         bn = False
@@ -96,12 +103,15 @@ class WGAN(BaseGAN):
         d_params['discriminator']['minibatch_reg'] = False # Use minibatch regularization
         d_params['discriminator']['spectral_norm'] = False # use spectral norm
 
-
         return d_params
 
-    def __init__(self, params, name='wgan'):
-        super().__init__(params=params, name=name)
-        self._summary = tf.summary.merge(tf.get_collection("model"))
+    @property
+    def E_loss(self):
+        return self._E_loss
+
+    @property
+    def has_encoder(self):
+        return True
 
     def _build_generator(self):
         shape = self._params['shape']
@@ -122,37 +132,22 @@ class WGAN(BaseGAN):
             self._params['generator']['in_conv_shape'] = in_conv_shape
   
         self._build_generator()
-        # TODO: Add build_encoder() function, which would create self.z_real
+        self.z_real = self.encoder(self.X_real, reuse=False)
         self._D_fake = self.discriminator(self.X_fake, self.z, reuse=False)
-        self._D_real = self.discriminator(self.X_real, self.z, reuse=True)  #TODO: change self.z to the output of encoder
+        self._D_real = self.discriminator(self.X_real, self.z_real, reuse=True)
         self._D_loss_f = tf.reduce_mean(self._D_fake)
         self._D_loss_r = tf.reduce_mean(self._D_real)
 
-        if self.params['loss_type'] == 'wasserstein':
-            # Wasserstein loss
-            gamma_gp = self.params['gamma_gp']
-            print(' Wasserstein loss with gamma_gp={}'.format(gamma_gp))
-            self._D_gp = self.wgan_regularization(gamma_gp, [self.X_fake], [self.X_real], [self.z], [self.z]) #TODO: change one of the self.z to the output of the encoder
-            self._D_loss = -(self._D_loss_r - self._D_loss_f) + self._D_gp
-            self._G_loss = -self._D_loss_f
-        elif self.params['loss_type'] == 'normalized_wasserstein':            # Wasserstein loss
-            gamma_gp = self.params['gamma_gp']
-            print(' Normalized Wasserstein loss with gamma_gp={}'.format(gamma_gp))
-            self._D_gp = self.wgan_regularization(gamma_gp, [self.X_fake], [self.X_real])
-            reg = tf.nn.relu(self._D_loss_r*self._D_loss_f)
-            self._D_loss = -(self._D_loss_r - self._D_loss_f) + self._D_gp + reg
-            self._G_loss = -self._D_loss_f
-            tf.summary.scalar("Disc/reg", reg, collections=["train"])
-        elif self.params['loss_type'] == 'hinge':
-            # Hinge loss
-            print(' Hinge loss.')
-            self._D_loss = tf.nn.relu(1-self._D_loss_r) + tf.nn.relu(self._D_loss_f+1)
-            self._G_loss = -self._D_loss_f
-        else:
-            raise ValueError('Unknown loss type!')    
+        # Wasserstein loss
+        gamma_gp = self.params['gamma_gp']
+        print(' Wasserstein loss with gamma_gp={}'.format(gamma_gp))
+        self._D_gp = self.wgan_regularization(gamma_gp, [self.X_fake], [self.X_real], [self.z], [self.z_real])
+        self._D_loss = -(self._D_loss_r - self._D_loss_f) + self._D_gp
+        self._G_loss = -self._D_loss_f
+        self._E_loss = self._D_loss_r
+
         self._inputs = (self.z)
         self._outputs = (self.X_fake)
-
 
     def _add_summary(self):
         tf.summary.histogram('Prior/z', self.z, collections=['model'])
@@ -162,6 +157,9 @@ class WGAN(BaseGAN):
 
     def generator(self, z, **kwargs):
         return generator(z, params=self.params['generator'], **kwargs)
+
+    def encoder(self, X, **kwargs):
+        return encoder(X, params=self.params["encoder"], **kwargs)
 
     def discriminator(self, X, z, **kwargs):
         return discriminator(X, z, params=self.params['discriminator'], **kwargs)
@@ -328,7 +326,7 @@ class WGAN(BaseGAN):
     def data_size(self):
         return self._data_size
 
-class SpectrogramGAN(WGAN):
+class BiSpectrogramGAN(BiWGAN):
     def default_params(self):
         d_params = super().default_params()
         d_params['generator']['consistency_contribution'] = 0
@@ -363,7 +361,7 @@ class SpectrogramGAN(WGAN):
         self._std_R_Con = tf.squeeze(self._std_R_Con)
         self._std_F_Con = tf.squeeze(self._std_F_Con)
                 
-        self._G_Reg =  tf.abs(self._mean_R_Con - self._mean_F_Con)
+        self._G_Reg = tf.abs(self._mean_R_Con - self._mean_F_Con)
         self._G_loss += consistency_contribution*self._G_Reg
 
     def _wgan_summaries(self):
@@ -376,7 +374,7 @@ class SpectrogramGAN(WGAN):
         tf.summary.scalar("Gen/R_STD_Con", self._std_R_Con, collections=["train"])   
         tf.summary.scalar("Gen/F_STD_Con", self._std_F_Con, collections=["train"])  
 
-        
+"""     
 class DiffSpectrogramGAN(SpectrogramGAN):   
     def secondDerivs(self, spectrogram):
         ttderiv = spectrogram[:, 1:-1, :-2] - 2*spectrogram[:, 1:-1, 1:-1] + spectrogram[:, 1:-1, 2:] + tf.constant(np.pi / 4)
@@ -435,8 +433,9 @@ class InpaintingGAN(WGAN):
 
     def generator(self, z, y, **kwargs):
         return generator_border(z, y=y, params=self.params['generator'], **kwargs)
+"""
 
-
+"""
 class CosmoWGAN(WGAN):
     def default_params(self):
         d_params = deepcopy(super().default_params())
@@ -467,8 +466,9 @@ class CosmoWGAN(WGAN):
         for met in self._cosmo_metric_list:
             feed_dict = met.compute_summary(X_fake, X_real, feed_dict)
         return feed_dict
+"""
 
-
+"""
 class LapWGAN(WGAN):
     # TODO add summaries for the 1D case...
     def default_params(self):
@@ -534,7 +534,9 @@ class LapWGAN(WGAN):
             X_smooth = self.X_smooth.eval(feed_dict=feed_dict)
             feed_dict = self._plot_down.compute_summary(np.squeeze(X_smooth), feed_dict=feed_dict)
         return feed_dict
+"""
 
+"""
 class UpscalePatchWGAN(WGAN):
     '''
     Generate blocks, using top, left and top-left border information
@@ -688,6 +690,7 @@ class UpscalePatchWGAN(WGAN):
             else:
                 newX = tf.concat(y, axis=axis)
             return generator(z, X=newX, params=self.params['generator'], **kwargs)
+"""
 
 # def remove_center(X, data_size):
 #     '''Only keep the last pixel and set the center to 0.'''
@@ -727,7 +730,7 @@ class UpscalePatchWGAN(WGAN):
 #         newy = tf.concat(y, axis=axis)
 #         return generator_border(z, y=newy, params=self.params['generator'], **kwargs)
 
-
+"""
 class UpscalePatchWGANBorders(UpscalePatchWGAN):
     '''
     Generate blocks, using top, left and top-left border information
@@ -830,7 +833,7 @@ class UpscalePatchWGANBorders(UpscalePatchWGAN):
         axis = self.data_size +1
         newy = tf.concat(y, axis=axis)
         return generator_border(z, y=newy, params=self.params['generator'], **kwargs)
-
+"""
 
 # class GanModel(object):
 #     ''' Abstract class for the model'''
@@ -2052,6 +2055,58 @@ def discriminator(x, z, params, reuse=True, scope="discriminator"):
         rprint(''.join(['-']*50)+'\n', reuse)
     return x
 
+
+def encoder(x, params, reuse=True, scope="encoder"):
+    conv = get_conv(params['data_size'])
+
+    assert (len(params['stride']) ==
+            len(params['nfilter']) ==
+            len(params['batch_norm']))
+    nconv = len(params['stride'])
+    nfull = len(params['full'])
+    latent_dim = params['latent_dim']
+
+    for it, st in enumerate(params['stride']):
+        if not (isinstance(st, list) or isinstance(st, tuple)):
+            params['stride'][it] = [st] * params['data_size']
+
+    with tf.variable_scope(scope, reuse=reuse):
+        rprint('Encoder \n' + ''.join(['-'] * 50), reuse)
+        rprint('     The data input is of size {}'.format(x.shape), reuse)
+
+        for i in range(nconv):
+            x = conv(x,
+                     nf_out=params['nfilter'][i],
+                     shape=params['shape'][i],
+                     stride=params['stride'][i],
+                     use_spectral_norm=params['spectral_norm'],
+                     name='{}_conv'.format(i),
+                     summary=params['summary'])
+            rprint('     {} Conv layer with {} channels'.format(i, params['nfilter'][i]), reuse)
+            rprint('         Size of the variables: {}'.format(x.shape), reuse)
+
+            x = params['activation'](x)
+
+        x = reshape2d(x, name='img2vec')
+        rprint('     Reshape to {}'.format(x.shape), reuse)
+
+        for i in range(nfull):
+            x = linear(x,
+                       params['full'][i],
+                       '{}_full'.format(i + nconv),
+                       summary=params['summary'])
+            x = params['activation'](x)
+            rprint('     {} Full layer with {} outputs'.format(nconv + i, params['full'][i]), reuse)
+            rprint('         Size of the variables: {}'.format(x.shape), reuse)
+
+        x = linear(x, latent_dim, 'out', summary=params['summary'])
+        # x = tf.sigmoid(x)
+        rprint('     {} Full layer with {} outputs'.format(nconv + nfull, 1), reuse)
+        rprint('     The output is of size {}'.format(x.shape), reuse)
+        rprint(''.join(['-'] * 50) + '\n', reuse)
+    return x
+
+
 def generator(x, params, X=None, y=None, reuse=True, scope="generator"):
     assert(len(params['stride']) == len(params['nfilter'])
            == len(params['batch_norm'])+1)
@@ -2133,7 +2188,7 @@ def generator(x, params, X=None, y=None, reuse=True, scope="generator"):
 
         
         if params.get('use_conv_over_deconv', True):
-            conv_over_deconv = stride2reduction(params['stride'])==1 # If true use conv, else deconv
+            conv_over_deconv = stride2reduction(params['stride']) == 1  # If true use conv, else deconv
         else:
             conv_over_deconv = False
 
@@ -2212,58 +2267,6 @@ def generator(x, params, X=None, y=None, reuse=True, scope="generator"):
 
         x = apply_non_lin(params['non_lin'], x, reuse)
 
-        rprint('     The output is of size {}'.format(x.shape), reuse)
-        rprint(''.join(['-']*50)+'\n', reuse)
-    return x
-
-
-def encoder(x, params, latent_dim, reuse=True, scope="encoder"):
-
-    assert(len(params['stride']) ==
-           len(params['nfilter']) ==
-           len(params['batch_norm']))
-    nconv = len(params['stride'])
-    nfull = len(params['full'])
-
-    with tf.variable_scope(scope, reuse=reuse):
-        rprint('Encoder \n'+''.join(['-']*50), reuse)
-        rprint('     The input is of size {}'.format(x.shape), reuse)
-        for i in range(nconv):
-            x = conv2d(x,
-                       nf_out=params['nfilter'][i],
-                       shape=params['shape'][i],
-                       stride=params['stride'][i],
-                       name='{}_conv'.format(i),
-                       summary=params['summary'])
-            rprint('     {} Conv layer with {} channels'.format(i, params['nfilter'][i]), reuse)
-            if params['batch_norm'][i]:
-                x = batch_norm(x, name='{}_bn'.format(i), train=True)
-                rprint('         Batch norm', reuse)
-            rprint('         Size of the variables: {}'.format(x.shape), reuse)
-
-            x = lrelu(x)
-
-        x = conv2d(x,
-                   nf_out=64,
-                   shape=[1,1],
-                   stride=1,
-                   name='out',
-                   summary=params['summary'])
-        x = reshape2d(x, name='img2vec')
-        rprint('     Reshape to {}'.format(x.shape), reuse)
-        for i in range(nfull):
-            x = linear(x,
-                       params['full'][i],
-                       '{}_full'.format(i+nconv),
-                       summary=params['summary'])
-            x = lrelu(x)
-            rprint('     {} Full layer with {} outputs'.format(nconv+i, params['full'][i]), reuse)
-            rprint('         Size of the variables: {}'.format(x.shape), reuse)
-
-        #x = linear(x, latent_dim, 'out', summary=params['summary'])
-
-        # x = tf.sigmoid(x)
-        rprint('     {} Full layer with {} outputs'.format(nconv+nfull, 1), reuse)
         rprint('     The output is of size {}'.format(x.shape), reuse)
         rprint(''.join(['-']*50)+'\n', reuse)
     return x

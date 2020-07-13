@@ -9,6 +9,7 @@ import yaml
 
 from tfnntools.nnsystem import NNSystem
 
+
 class GANsystem(NNSystem):
     """General GAN System class.
 
@@ -92,7 +93,6 @@ class GANsystem(NNSystem):
 
     @staticmethod
     def build_optmizer(params):
-
         learning_rate = params['learning_rate']
         optimizer = params['optimizer']
         kwargs = params['kwargs']
@@ -127,8 +127,8 @@ class GANsystem(NNSystem):
             feed_dict[self.net.z] = self.net.sample_latent(self.params['optimization']['batch_size'])
         # Update Encoder
         if self.net.has_encoder:
-            _, loss_e = self._sess.run(
-                self._optimize[2], self.net.loss[2],
+            _, loss_e = self._sess.run([
+                self._optimize[2], self.net.loss[2]],
                 feed_dict=feed_dict)
         # Update generator
         curr_loss = self._sess.run([self._optimize[1], *self.net.loss], feed_dict=feed_dict)[1:]
@@ -137,6 +137,7 @@ class GANsystem(NNSystem):
             self._epoch_loss_gen = 0
         self._epoch_loss_disc += curr_loss[0]
         self._epoch_loss_gen += curr_loss[1]
+        self._epoch_loss_encoder += curr_loss[2]
         return curr_loss
 
     def _train_log(self, feed_dict):
