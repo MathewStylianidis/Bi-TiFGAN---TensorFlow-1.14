@@ -135,6 +135,7 @@ class GANsystem(NNSystem):
         if idx == 0:
             self._epoch_loss_disc = 0
             self._epoch_loss_gen = 0
+            self._epoch_loss_encoder = 0
         self._epoch_loss_disc += curr_loss[0]
         self._epoch_loss_gen += curr_loss[1]
         self._epoch_loss_encoder += curr_loss[2]
