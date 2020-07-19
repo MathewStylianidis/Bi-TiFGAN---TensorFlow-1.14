@@ -1,7 +1,7 @@
 import sys
 sys.path.insert(0, '../../')
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="3"
 
 import numpy as np
 import tensorflow as tf
@@ -21,12 +21,12 @@ import numpy as np
 
 downscale = 1
 
-path = os.path.join("..", "Bi-TiFGAN", "data", "CREMA-D_Postprocessed-chunked")
+path = os.path.join("/", "media", "datastore", "c-matsty-data", "SpeechCommands_Preproc_2_training", "input_data")
 
 files = os.listdir(path)
 
 X = []
-for file in files[:10]:
+for file in files:
     if not file.endswith(".npz"):
         continue
     file_path = os.path.join(path, file)
@@ -99,7 +99,7 @@ params_generator['spectral_norm'] = True
 params_generator['in_conv_shape'] = [8, 4]
 
 params_optimization = dict()
-params_optimization['batch_size'] = 2
+params_optimization['batch_size'] = 64
 params_optimization['epoch'] = 10000
 params_optimization['n_critic'] = 5
 params_optimization['generator'] = dict()
@@ -135,7 +135,7 @@ params['summary_dir'] = os.path.join(global_path, name +'_summary/')
 params['save_dir'] = os.path.join(global_path, name + '_checkpoints/')
 params['Nstats'] = 500
 
-#resume, params = utils.test_resume(True, params)
+resume, params = utils.test_resume(True, params)
 params['optimization']['epoch'] = 10000
 
 biwgan = GANsystem(BiSpectrogramGAN, params)

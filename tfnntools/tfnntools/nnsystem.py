@@ -46,7 +46,7 @@ class NNSystem(object):
         self._params['net'] = deepcopy(self.net.params)
         self._name = self._net.name
         self._add_optimizer()
-        self._saver = tf.train.Saver(tf.global_variables(), max_to_keep=100)
+        self._saver = tf.train.Saver(tf.global_variables(), max_to_keep=200)
         utils.show_all_variables()
         self._summaries = tf.summary.merge(tf.get_collection("train"))
 
@@ -75,14 +75,12 @@ class NNSystem(object):
         return new_feed_dict
 
     def train(self, dataset, resume=False):
-
         n_data = dataset.N
         batch_size = self.params['optimization']['batch_size']
         self._counter = 1
         self._n_epoch = self.params['optimization']['epoch']
         self._total_iter = self._n_epoch * (n_data // batch_size) - 1
         self._n_batch = n_data // batch_size
-
         self._save_current_step = False
 
         # Create the save diretory if it does not exist
