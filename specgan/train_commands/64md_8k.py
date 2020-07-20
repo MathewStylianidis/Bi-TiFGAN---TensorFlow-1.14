@@ -1,7 +1,7 @@
 import sys
 sys.path.insert(0, '../../')
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import numpy as np
 import tensorflow as tf
@@ -18,15 +18,18 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 import scipy.io
 import numpy as np
+from tqdm import tqdm
 
 downscale = 1
 
-path = os.path.join("/", "media", "datastore", "c-matsty-data", "SpeechCommands_Preproc_2_training", "input_data")
+#path = os.path.join("/", "media", "datastore", "c-matsty-data", "SpeechCommands_Preproc_2_training", "input_data")
+path = os.path.join("/", "media", "datastore", "c-matsty-data", "SpeechCommands_Preproc_21training", "input_data")
 
 files = os.listdir(path)
 
+print("Loading data")
 X = []
-for file in files:
+for file in tqdm(files):
     if not file.endswith(".npz"):
         continue
     file_path = os.path.join(path, file)
@@ -41,9 +44,8 @@ print(np.mean(preprocessed_images[:, :256, :]))
 dataset = Dataset(preprocessed_images[:, :256])
 
 
-
 time_str = 'commands_md64_8k'
-global_path = '../../saved_results'
+global_path = '../../bitifgan-_results-sc09-run2'
 
 name = time_str
 
@@ -139,5 +141,5 @@ resume, params = utils.test_resume(True, params)
 params['optimization']['epoch'] = 10000
 
 biwgan = GANsystem(BiSpectrogramGAN, params)
-
+print("Start training")
 biwgan.train(dataset, resume=None)
