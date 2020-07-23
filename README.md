@@ -9,7 +9,7 @@ You can download the SpeechCommands dataset from [https://ai.googleblog.com/2017
 
 1. **Split the dataset in training and test dataset using a text file with all the test files**
  
-    Splitting CREMA-D dataset:
+    CREMA-D splitting:
 	```
 	python -m preprocessing.split_dataset --dataset-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_AudioWAV/ --test-list-path=data/cremad_testing_list.txt
 	```
