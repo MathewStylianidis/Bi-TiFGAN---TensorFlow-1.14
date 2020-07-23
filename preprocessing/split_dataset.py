@@ -35,7 +35,7 @@ def ig_f(dir, files):
     return [f for f in files if os.path.isfile(os.path.join(dir, f))]
 
 
-def split_dataset(dataset_path, test_set_paths, replace_dir):
+def     split_dataset(dataset_path, test_set_paths, replace_dir):
     """ Splits dataset into a training set and test set.
 
     Args:
@@ -46,12 +46,13 @@ def split_dataset(dataset_path, test_set_paths, replace_dir):
     Returns:
 
     """
+    dataset_path = dataset_path.rstrip(os.path.sep)
     dataset_root_dir = os.path.dirname(dataset_path)
     dataset_dir_name = os.path.basename(dataset_path)
     training_set_path = os.path.join(dataset_root_dir, dataset_dir_name + "_training")
     test_set_path = os.path.join(dataset_root_dir, dataset_dir_name + "_test")
 
-    ## Create directories for training and test set
+    # Create directories for training and test set
     shutil.copytree(dataset_path, training_set_path, ignore=ig_f)
     shutil.copytree(dataset_path, test_set_path, ignore=ig_f)
 
@@ -59,6 +60,10 @@ def split_dataset(dataset_path, test_set_paths, replace_dir):
     # Get list of dataset file paths
     for root, subdirs, files in os.walk(dataset_path):
         dir_name = os.path.basename(root)
+        # If the sample is directly under the dataset directory and not
+        # inside a folder then don't add the dir_name to the path
+        if dir_name == dataset_dir_name:
+            dir_name = ""
         file_paths = [os.path.join(dir_name, file_name) for file_name in os.listdir(root)
                       if not os.path.isdir(os.path.join(root, file_name))]
         dataset_paths.extend(file_paths)
