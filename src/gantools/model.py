@@ -141,7 +141,7 @@ class BiWGAN(BaseGAN):
         # Wasserstein loss
         gamma_gp = self.params['gamma_gp']
         print(' Wasserstein loss with gamma_gp={}'.format(gamma_gp))
-        self._D_gp = self.wgan_regularization(gamma_gp, [self.X_fake], [self.X_real], [self.z], [self.z_real])
+        self._D_gp = 0 #self.wgan_regularization(gamma_gp, [self.X_fake], [self.X_real], [self.z], [self.z_real])
         self._D_loss = -(self._D_loss_r - self._D_loss_f) + self._D_gp
         self._G_loss = -self._D_loss_f
         self._E_loss = self._D_loss_r

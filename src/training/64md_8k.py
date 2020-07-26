@@ -1,7 +1,7 @@
 import sys
 sys.path.insert(0, '../../')
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 import numpy as np
 import tensorflow as tf
@@ -23,7 +23,7 @@ from tqdm import tqdm
 downscale = 1
 
 #path = os.path.join("/", "media", "datastore", "c-matsty-data", "SpeechCommands_Preproc_2_training", "input_data")
-path = os.path.join("/", "media", "datastore", "c-matsty-data", "SpeechCommands_Preproc_21training", "input_data")
+path = os.path.join("/", "media", "datastore", "c-matsty-data", "SpeechCommands_Preproc_2_training", "input_data")
 
 files = os.listdir(path)
 
@@ -45,7 +45,7 @@ dataset = Dataset(preprocessed_images[:, :256])
 
 
 time_str = 'commands_md64_8k'
-global_path = '../../bitifgan-_results-sc09-run2'
+global_path = '../../bitifgan-_results-sc09-run1-nogp'
 
 name = time_str
 
