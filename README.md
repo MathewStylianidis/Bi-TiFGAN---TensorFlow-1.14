@@ -25,6 +25,6 @@ You can download the SpeechCommands dataset from [https://ai.googleblog.com/2017
 
 **SpeechCommands training**:
 
-	```
+	
 	python -m training.64md_8k --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data --results-path=/media/datastore/c-matsty-data/checkpoints_summaries/<save_dir_name>
-	```
+	
