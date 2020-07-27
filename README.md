@@ -15,7 +15,7 @@ You can download the SpeechCommands dataset from [https://ai.googleblog.com/2017
 	```
 2.  **Convert training and test set from wav files to TiFGAN features**
  
-    CREMA-D preprocessing:
+    SpeechCommands preprocessing:
 	```
 	python -m preprocessing.preprocess_dataset --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_AudioWAV_training/ --results-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training --dataset-name="SpeechCommands"  --preproc-type=2
 	python -m preprocessing.preprocess_dataset --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_AudioWAV_test/ --results-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_test --dataset-name="SpeechCommands"  --preproc-type=2
