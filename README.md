@@ -5,7 +5,7 @@
 
 You can download the SpeechCommands dataset from [https://ai.googleblog.com/2017/08/launching-speech-commands-dataset.html](https://ai.googleblog.com/2017/08/launching-speech-commands-dataset.html) and the CREMA-D dataset from [https://github.com/CheyneyComputerScience/CREMA-D](https://github.com/CheyneyComputerScience/CREMA-D).
 
-### Preprocessing steps
+### 1. Preprocessing steps
 
 1. **Split the dataset in training and test dataset using a text file with all the test files**
  
@@ -21,7 +21,7 @@ You can download the SpeechCommands dataset from [https://ai.googleblog.com/2017
 	python -m preprocessing.preprocess_dataset --dataset-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_AudioWAV_test/ --results-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_Preproc1_test --dataset-name="CREMA-D"  --preproc-type=1
 	```
   
-### Training the GAN
+### 2. Training the GAN
 
 **SpeechCommands training**:
 
@@ -29,7 +29,7 @@ You can download the SpeechCommands dataset from [https://ai.googleblog.com/2017
 	python -m training.64md_8k --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data --results-path=/media/datastore/c-matsty-data/checkpoints_summaries/<save_dir_name>
 	
 	
-### Evaluating learned features over time
+### 3. Evaluating learned features over time
 
 We load each checkpoint from training and for each checkpoint we extract features, train a classifier and test it on a given test set. In this way we evaluate the features learned by the GAN over its training.
 
