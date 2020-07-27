@@ -35,6 +35,4 @@ We load each checkpoint from training and for each checkpoint we extract feature
 
 **SpeechCommands evaluation**:
 
-The --checkpoints-dir parameter points to the directory with the saved training results. It contains two sub-directories: One including the checkpoints and one with the tensorboard summary.
-	
 	python -m feature_evaluation.evaluate_over_time --train-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training --test-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_test --checkpoints-dir=/media/datastore/c-matsty-data/checkpoints_summaries/<save_dir_name> --evaluation-model="RandomForest"
