@@ -34,5 +34,7 @@ You can download the SpeechCommands dataset from [https://ai.googleblog.com/2017
 We load each checkpoint from training and for each checkpoint we extract features, train a classifier and test it on a given test set. In this way we evaluate the features learned by the GAN over its training.
 
 **SpeechCommands evaluation**:
+
+The --checkpoints-dir parameter points to the directory with the saved training results. It contains two sub-directories: One including the checkpoints and one with the tensorboard summary.
 	
 	python -m feature_evaluation.evaluate_over_time --train-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training --test-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_test --checkpoints-dir=/media/datastore/c-matsty-data/checkpoints_summaries/<save_dir_name> --evaluation-model="RandomForest"
