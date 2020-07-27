@@ -20,12 +20,10 @@ from gantools.data.Dataset import Dataset
 from gantools.gansystem import GANsystem
 from hyperparams.tifgan_hyperparams import get_hyperparams
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
-time_str = 'commands_md64_8k'
-global_path = 'saved_results'
-name = time_str
-
+name = 'commands_md64_8k'
+batch_size = 64
 
 def get_arguments():
     """Parse all the arguments provided from the CLI.
@@ -35,9 +33,11 @@ def get_arguments():
     """
     parser = argparse.ArgumentParser(description="Preprocess dataset")
     parser.add_argument("--dataset-path", type=str, required=True,
-                        help="Path to directory where the dataset (the tf_records) are stored.")
+                        help="Path to directory where the dataset is stored.")
     parser.add_argument("--checkpoint-step", type=int, required=False, default=None,
                         help="Step of the checkpoint at which the Bi-TiF-GAN weights are saved.")
+    parser.add_argument("--results-dir", type=str, required=True,
+                        help="Directory containing the training results for the model.")
     parser.add_argument("--features-path", type=str, required=True,
                         help="Path where the extracted features will be saved.")
     return parser.parse_args()
@@ -46,19 +46,22 @@ def get_arguments():
 if __name__ == "__main__":
     args = get_arguments()
     dataset_path = args.dataset_path
+    results_dir = args.results_dir
     checkpoint_step = args.checkpoint_step
     features_path = args.features_path
 
+    files = os.listdir(dataset_path)
+    print(len(files))
     print("Loading data")
     X = []
     for file in tqdm(files):
         if not file.endswith(".npz"):
             continue
-        file_path = os.path.join(path, file)
-        X.append(np.load(file_path)['logspecs'])
-    X = np.vstack(X)
+        file_path = os.path.join(dataset_path, file)
+        X.append(np.load(file_path)['logspecs'][:, :256])
+    X = np.vstack(X)[..., np.newaxis]
 
-    params = get_hyperparams(global_path, name)
+    params = get_hyperparams(results_dir, name)
     biwgan = GANsystem(BiSpectrogramGAN, params)
 
     features = []

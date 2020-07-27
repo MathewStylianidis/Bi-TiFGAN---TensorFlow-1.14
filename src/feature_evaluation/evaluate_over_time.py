@@ -20,16 +20,15 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_recall_fscore_support
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 DEFAULT_NAME = "wgan"
-INPUT_FEATURES_KEY = "input"
-LABEL_KEY = "label"
-ACTOR_KEY = "actor"
-INPUT_TIME_DIM = 256  # Input dimensionality in the time axis
-INPUT_FREQ_DIM = 128  # Input dimensionality in the frequency axis (number of bins)
 DEFAULT_SAVE_DIR = os.path.join("..", "results")
+
+# Dataset sub-directory names
+INPUT_DATA_DIR = "input_data"
+LABELS_DIR = "labels"
 
 # Define strings that denote the different sk-learn models to be used for feature evaluation
 LOGISTIC_REGRESSION_STR = "LogisticRegression"
@@ -43,10 +42,10 @@ def get_arguments():
       A list of parsed arguments.
     """
     parser = argparse.ArgumentParser(description="Preprocess dataset")
-    parser.add_argument("--tfrecord-path-train", type=str, required=True,
-                        help="Path to directory where the training dataset (the tf_records) is stored.")
-    parser.add_argument("--tfrecord-path-test", type=str, required=True,
-                        help="Path to directory where the test dataset (the tf_records) is stored.")
+    parser.add_argument("--train-path", type=str, required=True,
+                        help="Path to directory where the training dataset is stored.")
+    parser.add_argument("--test-path", type=str, required=True,
+                        help="Path to directory where the test dataset is stored.")
     parser.add_argument("--checkpoints-dir", type=str, required=True,
                         help="Path to the directory with all the checkpoints for the model.")
     parser.add_argument("--save-dir", type=str, required=False, default=DEFAULT_SAVE_DIR,
@@ -58,57 +57,25 @@ def get_arguments():
     return parser.parse_args()
 
 
-def parse_function(example_proto):
-    features = {
-        INPUT_FEATURES_KEY: tf.io.FixedLenFeature([], tf.string),
-        LABEL_KEY: tf.io.FixedLenFeature([], tf.string),
-        ACTOR_KEY: tf.io.FixedLenFeature([], tf.string)
-    }
-    serialized_example = tf.io.parse_single_example(example_proto, features)
-    input_features = serialized_example[INPUT_FEATURES_KEY]
-    input_features = tf.io.decode_raw(input_features, tf.float32)
-    input_features.set_shape([INPUT_TIME_DIM * INPUT_FREQ_DIM])
-    input_features = tf.reshape(input_features, [INPUT_TIME_DIM, INPUT_FREQ_DIM, 1])
-
-    label = serialized_example[LABEL_KEY]
-    label = tf.io.decode_raw(label, tf.uint8)
-
-    actor = serialized_example[ACTOR_KEY]
-    actor = tf.io.decode_raw(actor, tf.uint8)
-
-    return input_features, label, actor
-
-
-def load_data_labels(tf_record_path):
-    """ Loads the labels and the actor identifiers for each sample in the dataset.
+def load_data_labels(labels_path):
+    """ Loads the label identifiers for all dataset samples.
 
     Args:
-        tf_record_path: The path to the directory with the TFRecrods.
+        labels_path: The path to the directory with the stored labels.
 
     Returns:
-        A list of tuples of (label, actor-id) for each sample in the dataset.
+        A numpy array with the dataset labels.
 
     """
-    with tf.Session() as sess:
-        tf_dataset_filenames = os.listdir(tf_record_path)
-        tf_dataset_filepaths = [os.path.join(tf_record_path, filename) for filename in tf_dataset_filenames]
-        tfrecord_dataset = tf.data.TFRecordDataset(tf_dataset_filepaths)
-        tfrecord_dataset = tfrecord_dataset.map(parse_function, num_parallel_calls=1)
-        iterator = tfrecord_dataset.make_one_shot_iterator()
-        x = iterator.get_next()
-
-        y = []
-        actors = []
-        for _ in range(len(tf_dataset_filepaths)):
-            features, label, actor = sess.run(x)
-            label = str(label.flatten(), 'ascii')
-            y.append(label)
-            actor = str(actor.flatten(), 'ascii')
-            actors.append(actor)
-
-    y = np.stack(y)
-    actors = np.stack(actors)
-    return y, actors
+    files = os.listdir(labels_path)
+    Y = []
+    for file in tqdm(files):
+        if not file.endswith(".npy"):
+            continue
+        file_path = os.path.join(labels_path, file)
+        Y.append(np.load(file_path).reshape((-1, 1)))
+    Y = np.vstack(Y).flatten()
+    return Y
 
 
 def get_checkpoint_paths(checkpoints_dir, name):
@@ -263,36 +230,36 @@ def save(results, save_dir):
 
 if __name__ == "__main__":
     args = get_arguments()
-    tfrecord_path_train = args.tfrecord_path_train
-    tfrecord_path_test = args.tfrecord_path_test
+    train_path = args.train_path
+    test_path = args.test_path
     checkpoints_dir = args.checkpoints_dir
     save_dir = args.save_dir
     evaluation_model = args.evaluation_model
     name = args.model_name
 
+    training_input_path = os.path.join(train_path, INPUT_DATA_DIR)
+    training_labels_path = os.path.join(train_path, LABELS_DIR)
+
+    test_input_path = os.path.join(test_path, INPUT_DATA_DIR)
+    test_labels_path = os.path.join(test_path, LABELS_DIR)
+
     print("-Getting and sorting checkpoint paths according to update step")
     checkpoint_tuples = get_checkpoint_paths(checkpoints_dir, name=name)
 
-    print("-Read labels and actor meta-data for training dataset samples.")
-    y_train, actors_train = load_data_labels(tfrecord_path_train)
+    print("-Read label meta-data for training dataset samples.")
+    y_train = load_data_labels(training_labels_path)
     label_dict = {value: index for index, value in enumerate(np.unique(y_train))}
-    actor_dict = {value: index for index, value in enumerate(np.unique(actors_train))}
     y_train = np.vectorize(label_dict.get)(y_train)
-    actors = np.vectorize(actor_dict.get)(actors_train)
-    unique_actors_train = np.unique(actors_train)
 
-    rint("-Calculating class_weights based on the training data class labels")
+    print("-Calculating class_weights based on the training data class labels")
     class_counts = [len(y_train[y_train == i]) for i in label_dict.values()]
     class_weights = [max(class_counts) / class_count for class_count in class_counts]
     class_weight_dict = {class_idx: class_weight for class_idx, class_weight in zip(label_dict.values(), class_weights)}
 
-    print("-Read labels and actor meta-data for test dataset samples.")
-    y_test, actors_test = load_data_labels(tfrecord_path_test)
+    print("-Read label meta-data for test dataset samples.")
+    y_test = load_data_labels(test_labels_path)
     label_dict = {value: index for index, value in enumerate(np.unique(y_test))}
-    actor_dict = {value: index for index, value in enumerate(np.unique(actors_test))}
     y_test = np.vectorize(label_dict.get)(y_test)
-    actors_test = np.vectorize(actor_dict.get)(actors_test)
-    unique_actors_test = np.unique(actors_test)
 
     train_sample_weight = [class_weight_dict[label] for label in y_train]
     test_sample_weight = [class_weight_dict[label] for label in y_test]
@@ -304,23 +271,28 @@ if __name__ == "__main__":
     random_feature_filename = str(random.getrandbits(64)) + ".npy"
 
     for update_step, checkpoint_path in tqdm(checkpoint_tuples):
+        # Get the parent directory to the checkpoint directory
+        results_path = checkpoint_path.rstrip(os.path.sep)
+        results_path = os.path.join(checkpoint_path, "..", "..")
+
         tqdm.write("Extracting features with model from checkpoint: {}".format(checkpoint_path))
         # Run feature extraction script for the training set - removing the print outs
-        subprocess.call(" python -m feature_extraction.extract_features --tfrecord-path={} --checkpoint-step={} "
-                        "--features-path={}".format(tfrecord_path_train, update_step, random_feature_filename),
-                        shell=True, stdout=FNULL, stderr=subprocess.STDOUT)
+        subprocess.call(" python -m feature_extraction.extract_features --dataset-path={} --checkpoint-step={} "
+                        "--features-path={} --results-dir={}"
+                        .format(training_input_path, update_step, random_feature_filename, results_path),
+                        shell=True)
         # Load features
         X_train = np.load(random_feature_filename)
 
         # Run feature extraction script for the test set - removing the print outs
-        subprocess.call(" python -m feature_extraction.extract_features --tfrecord-path={} --checkpoint-step={} "
-                        "--features-path={}".format(tfrecord_path_test, update_step, random_feature_filename),
+        subprocess.call(" python -m feature_extraction.extract_features --dataset-path={} --checkpoint-step={} "
+                        "--features-path={} --results-dir={}"
+                        .format(test_input_path, update_step, random_feature_filename, results_path),
                         shell=True, stdout=FNULL, stderr=subprocess.STDOUT)
         # Load features
         X_test = np.load(random_feature_filename)
 
         tqdm.write("Evaluating features extracted with model from checkpoint {}.".format(checkpoint_path))
-
         # Get norm of encoder's output normalizing the features
         dataset_norms = np.linalg.norm(X_train, axis=0)
         avg_dataset_norms.append(np.mean(dataset_norms))
