@@ -325,11 +325,11 @@ def extract_tifgan_features(X, y, actors, fft_hop_size, fft_window_length, batch
                 print(e)
 
     # Save last batch
-    if index % batch_size < batch_size - 1:
+    last_batch_samples = index % batch_size + 1
+    if last_batch_samples > 0:
         try:
             batch_no = int(index / batch_size)
 
-            last_batch_samples = index % batch_size
             spectrograms = spectrograms[:last_batch_samples]
             tgrads = tgrads[:last_batch_samples]
             fgrads = fgrads[:last_batch_samples]
