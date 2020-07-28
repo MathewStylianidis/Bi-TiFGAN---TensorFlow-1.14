@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -33,6 +33,13 @@ LABELS_DIR = "labels"
 # Define strings that denote the different sk-learn models to be used for feature evaluation
 LOGISTIC_REGRESSION_STR = "LogisticRegression"
 RANDOM_FOREST_STR = "RandomForest"
+
+CHANCE_LEVEL_METRICS = {
+    "precision": 0.1,
+    "recall": 0.1,
+    "f1-score": 0.1,
+    "accuracy": 0.1
+}
 
 
 def get_arguments():
@@ -117,8 +124,9 @@ def visualize(results, label_dict, save_dir, avg_dataset_norms):
     """ Visualizes the results of the feature extraction and evaluation over the different update steps.
 
     Args:
-        results: A list of tuples where each tuple is the update step number along with a numpy array containing
-            the precision, recall and f1-score for each class.
+        results: A list of tuples where each tuple contains the update step number (1st element),
+            along with a numpy array (2nd element) containing the precision, recall and f1-score
+            for each class, and finally the accuracy (3rd element).
         label_dict: A dictionary mapping the index of each class to its string representation.
         save_dir: The directory where the results should be saved.
 
@@ -136,8 +144,9 @@ def visualize(results, label_dict, save_dir, avg_dataset_norms):
     avg_recall_list = []
     avg_precision_list = []
     avg_f1_score_list = []
+    accuracy_list = []
     update_steps = []
-    for update_step, metrics in results:
+    for update_step, metrics, accuracy in results:
         acc_recall = 0
         acc_precision = 0
         acc_f1_score = 0
@@ -154,10 +163,12 @@ def visualize(results, label_dict, save_dir, avg_dataset_norms):
         avg_precision_list.append(acc_precision / n_classes)
         avg_recall_list.append(acc_recall / n_classes)
         avg_f1_score_list.append(acc_f1_score / n_classes)
+        accuracy_list.append(accuracy)
         update_steps.append(update_step)
 
     # Plot average precision over time
     plt.plot(update_steps, avg_precision_list)
+    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["precision"] for i in range(len(update_steps))], '--')
     plt.title("Average precision over time")
     plt.xlabel("Update step")
     plt.ylabel("Average precision")
@@ -165,6 +176,7 @@ def visualize(results, label_dict, save_dir, avg_dataset_norms):
     plt.cla()
     # Plot average recall over time
     plt.plot(update_steps, avg_recall_list)
+    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["recall"] for i in range(len(update_steps))], '--')
     plt.title("Average recall over time")
     plt.xlabel("Update step")
     plt.ylabel("Average recall")
@@ -172,10 +184,19 @@ def visualize(results, label_dict, save_dir, avg_dataset_norms):
     plt.cla()
     # Plot average f-1 score over time
     plt.plot(update_steps, avg_f1_score_list)
+    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["f1-score"] for i in range(len(update_steps))], '--')
     plt.title("Average f-1 score over time")
     plt.xlabel("Update step")
     plt.ylabel("Average f-1 score")
     plt.savefig(os.path.join(save_dir, 'avg_f1.png'))
+    plt.cla()
+    # Plot accuracy over time
+    plt.plot(update_steps, accuracy_list)
+    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["accuracy"] for i in range(len(update_steps))], '--')
+    plt.title("Accuracy over time")
+    plt.xlabel("Update step")
+    plt.ylabel("Accuracy")
+    plt.savefig(os.path.join(save_dir, 'accuracy.png'))
     plt.cla()
 
     # For each class, plot precision recall and f-1 score over time
@@ -223,9 +244,12 @@ def save(results, save_dir):
         None
     """
     array_dict = {}
-    for update_step, result in results:
+    acc_dict = {}
+    for update_step, result, accuracy in results:
         array_dict[str(update_step)] = result
+        acc_dict[str(update_step)] = accuracy
     np.savez(os.path.join(save_dir, "evaluation_over_time_results.npz"), **array_dict)
+    np.savez(os.path.join(save_dir, "evaluation_over_time_accuracies.npz"), **array_dict)
 
 
 if __name__ == "__main__":
@@ -314,8 +338,9 @@ if __name__ == "__main__":
         # Evaluate model
         y_preds = model.predict(X_test)
         metrics = np.array(precision_recall_fscore_support(y_test, y_preds)[:3]).T  # Omit supports
+        accuracy = accuracy_score(y_test, y_preds)
 
-        results.append((update_step, metrics))
+        results.append((update_step, metrics, accuracy))
     os.remove(random_feature_filename)
 
     print("-Visualizing and saving results")
