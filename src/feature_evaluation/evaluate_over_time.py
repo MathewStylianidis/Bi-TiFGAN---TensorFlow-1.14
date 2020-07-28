@@ -167,42 +167,50 @@ def visualize(results, label_dict, save_dir, avg_dataset_norms):
         update_steps.append(update_step)
 
     # Plot average precision over time
-    plt.plot(update_steps, avg_precision_list)
-    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["precision"] for i in range(len(update_steps))], '--')
+    plt.plot(update_steps, avg_precision_list, label="Average precision")
+    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["precision"] for _ in range(len(update_steps))], '--',
+             label="Chance level")
     plt.title("Average precision over time")
     plt.xlabel("Update step")
     plt.ylabel("Average precision")
+    plt.legend(loc="upper left")
     plt.savefig(os.path.join(save_dir, 'avg_precision.png'))
     plt.cla()
     # Plot average recall over time
-    plt.plot(update_steps, avg_recall_list)
-    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["recall"] for i in range(len(update_steps))], '--')
+    plt.plot(update_steps, avg_recall_list, label="Average recall")
+    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["recall"] for _ in range(len(update_steps))], '--',
+             label="Chance level")
     plt.title("Average recall over time")
     plt.xlabel("Update step")
     plt.ylabel("Average recall")
+    plt.legend(loc="upper left")
     plt.savefig(os.path.join(save_dir, 'avg_recall.png'))
     plt.cla()
     # Plot average f-1 score over time
-    plt.plot(update_steps, avg_f1_score_list)
-    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["f1-score"] for i in range(len(update_steps))], '--')
+    plt.plot(update_steps, avg_f1_score_list, label="Average f-1 score")
+    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["f1-score"] for _ in range(len(update_steps))], '--',
+             label="Chance level")
     plt.title("Average f-1 score over time")
     plt.xlabel("Update step")
     plt.ylabel("Average f-1 score")
+    plt.legend(loc="upper left")
     plt.savefig(os.path.join(save_dir, 'avg_f1.png'))
     plt.cla()
     # Plot accuracy over time
-    plt.plot(update_steps, accuracy_list)
-    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["accuracy"] for i in range(len(update_steps))], '--')
+    plt.plot(update_steps, accuracy_list, label="Average accuracy")
+    plt.plot(update_steps, [CHANCE_LEVEL_METRICS["accuracy"] for _ in range(len(update_steps))], '--',
+             label="Chance level")
     plt.title("Accuracy over time")
     plt.xlabel("Update step")
     plt.ylabel("Accuracy")
+    plt.legend(loc="upper left")
     plt.savefig(os.path.join(save_dir, 'accuracy.png'))
     plt.cla()
 
     # For each class, plot precision recall and f-1 score over time
     for i in range(n_classes):
-        plt.plot(update_steps, class_metric[i]["precision"])
         # Plot class precision
+        plt.plot(update_steps, class_metric[i]["precision"])
         plt.title("Precision over time: {}".format(label_dict[i]))
         plt.xlabel("Update step")
         plt.ylabel("Average precision")
