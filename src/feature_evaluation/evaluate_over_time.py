@@ -312,7 +312,7 @@ if __name__ == "__main__":
         subprocess.call(" python -m feature_extraction.extract_features --dataset-path={} --checkpoint-step={} "
                         "--features-path={} --results-dir={}"
                         .format(training_input_path, update_step, random_feature_filename, results_path),
-                        shell=True)
+                        shell=True, stdout=FNULL, stderr=subprocess.STDOUT)
         # Load features
         X_train = np.load(random_feature_filename)
 

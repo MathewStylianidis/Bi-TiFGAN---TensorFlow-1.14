@@ -61,22 +61,23 @@ if __name__ == "__main__":
         X.append(np.load(file_path)['logspecs'][:, :256])
     X = np.vstack(X)[..., np.newaxis]
 
-    params = get_hyperparams(results_dir, name)
-    biwgan = GANsystem(BiSpectrogramGAN, params)
+    with tf.device('/gpu:0'):
+        params = get_hyperparams(results_dir, name)
+        biwgan = GANsystem(BiSpectrogramGAN, params)
 
-    features = []
-    with tf.Session() as sess:
-        biwgan.load(sess=sess, checkpoint=checkpoint_step)
+        features = []
+        with tf.Session() as sess:
+            biwgan.load(sess=sess, checkpoint=checkpoint_step)
 
-        for i in range(0, len(X), batch_size):
-            x_batch = X[i:i+batch_size]
-            z = sess.run(biwgan._net.z_real, feed_dict={biwgan._net.X_real: x_batch})
-            features.append(z)
-    features = np.vstack(features)
+            for i in range(0, len(X), batch_size):
+                x_batch = X[i:i+batch_size]
+                z = sess.run(biwgan._net.z_real, feed_dict={biwgan._net.X_real: x_batch})
+                features.append(z)
+        features = np.vstack(features)
 
-    # Save features to designated path
-    feat_dir_path = os.path.dirname(os.path.abspath(features_path))
-    if not os.path.exists(feat_dir_path):
-        os.makedirs(feat_dir_path)
-    np.save(features_path, features)
-    print("-Features saved at: {}".format(features_path))
+        # Save features to designated path
+        feat_dir_path = os.path.dirname(os.path.abspath(features_path))
+        if not os.path.exists(feat_dir_path):
+            os.makedirs(feat_dir_path)
+        np.save(features_path, features)
+        print("-Features saved at: {}".format(features_path))
