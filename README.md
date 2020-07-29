@@ -58,3 +58,5 @@ We load each checkpoint from training and for each checkpoint we extract feature
                 
          python -m preprocessing.preprocess_dataset --dataset-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_AudioWAV_test/ --results-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_Preproc_1_test_FBANK--dataset-name=CREMA-D --preproc-type=1 --features-type="fbank" 
          python -m preprocessing.preprocess_dataset --dataset-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_AudioWAV_test/ --results-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_Preproc_1_test_MFCC--dataset-name=CREMA-D --preproc-type=1 --features-type="mfcc" 
+
+3. Run the crema_d_mfcc_fbank_benchmark notebook under notebooks/benchmarks
