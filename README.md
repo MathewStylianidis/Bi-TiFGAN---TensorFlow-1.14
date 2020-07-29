@@ -43,3 +43,18 @@ We load each checkpoint from training and for each checkpoint we extract feature
 **SpeechCommands evaluation**:
 
 	python -m feature_evaluation.evaluate_over_time --train-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training --test-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_test --checkpoints-dir=/media/datastore/c-matsty-data/checkpoints_summaries/<save_dir_name> --evaluation-model="RandomForest"
+	
+
+	
+### 3. Running the benchmarks
+
+**CREMA-D Benchmarks**:
+
+1. Generate MFCC and FBANK training features:
+  
+        python -m preprocessing.preprocess_dataset --dataset-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_AudioWAV_training/ --results-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_Preproc_1_training_FBANK --dataset-name=CREMA-D --preproc-type=1 --features-type="fbank"
+        python -m preprocessing.preprocess_dataset --dataset-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_AudioWAV_training/ --results-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_Preproc_1_training_MFCC--dataset-name=CREMA-D --preproc-type=1 --features-type="mfcc"
+ 2. Generate MFCC and FBANK test features:
+                
+         python -m preprocessing.preprocess_dataset --dataset-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_AudioWAV_test/ --results-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_Preproc_1_test_FBANK--dataset-name=CREMA-D --preproc-type=1 --features-type="fbank" 
+         python -m preprocessing.preprocess_dataset --dataset-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_AudioWAV_test/ --results-path=/media/datastore/c-matsty-data/datasets/CREMA-D/CREMA-D_Preproc_1_test_MFCC--dataset-name=CREMA-D --preproc-type=1 --features-type="mfcc" 
