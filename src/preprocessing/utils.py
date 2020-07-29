@@ -250,10 +250,11 @@ def exctract_mfcc_features(X, y, actors, fft_window_length, fft_hop_size, sampli
                 print(e)
 
     # Save last batch
-    if index % batch_size < batch_size - 1:
+    last_batch_samples = index % batch_size + 1
+    if last_batch_samples > 0:
         try:
             batch_no = int(index / batch_size)
-            last_batch_samples = index % batch_size + 1
+
             spectrograms = spectrograms[:last_batch_samples]
             file_path = os.path.join(input_dir_path, preproc_filename) + "_" + str(batch_no) + ".npy"
             label_file_path = os.path.join(labels_dir_path, preproc_filename) + "_" + str(batch_no) + "_labels.npy"
