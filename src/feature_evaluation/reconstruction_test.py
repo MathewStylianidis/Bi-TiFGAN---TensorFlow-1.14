@@ -42,7 +42,7 @@ def get_arguments():
                         help="The name of the trained model included in the checkpoint file names.")
     parser.add_argument("--latent-dim", type=int, required=False, default=DEFAULT_LATENT_DIM,
                         help="Dimensionality of the latent variable.")
-    parser.add_argument("--epsilon", type=int, required=False, default=DEFAULT_EPSILON,
+    parser.add_argument("--epsilon", type=float, required=False, default=DEFAULT_EPSILON,
                         help="Epsilon to be used for a smoothness test.")
     return parser.parse_args()
 
@@ -116,14 +116,14 @@ if __name__ == "__main__":
     plt.title(title, size=title_size)
     plt.xlabel("Update step", size=label_size)
     plt.ylabel("Reconstruction error", size=label_size)
-    plt.savefig(os.path.join(save_dir, 'reconstruction_error.png'))
+    plt.savefig(os.path.join(save_dir, 'reconstruction_error_{}.png'.format(epsilon)))
     plt.cla()
 
     plt.plot(list(avg_reconstruction_error.keys()), np.log(values))
     plt.title(log_title, size=title_size)
     plt.xlabel("Update step", size=label_size)
     plt.ylabel("Log reconstruction error", size=label_size)
-    plt.savefig(os.path.join(save_dir, 'log_reconstruction_error.png'))
+    plt.savefig(os.path.join(save_dir, 'log_reconstruction_error_{}.png'.format(epsilon)))
     plt.cla()
 
 
