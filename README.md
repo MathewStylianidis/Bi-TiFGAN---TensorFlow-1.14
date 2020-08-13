@@ -63,8 +63,17 @@ We load each checkpoint from training and for each checkpoint we extract feature
 
 
 	
-### 3. Generating samples
+### 4. Generating samples
 
 	python -m sample_generation.generate --results-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan-results-sc09-run2-gp/ --checkpoint-step=80000
 
 	
+### 5. Evaluate mean absolute reconstruction error over time
+
+1. Normal reconstruction error:
+
+	python -m feature_evaluation.reconstruction_test  --checkpoint-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan-results-sc09-run2-gp/commands_md64_8k_checkpoints/
+
+2. Smoothness test (Reconstruction error with an epsilon term added to the latent samples before feeding them to the generator)
+
+	python -m feature_evaluation.reconstruction_test  --checkpoint-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan-results-sc09-run2-gp/commands_md64_8k_checkpoints/ --epsilon=1e-5
