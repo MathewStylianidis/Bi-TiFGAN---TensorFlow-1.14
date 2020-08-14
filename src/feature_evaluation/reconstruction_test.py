@@ -107,8 +107,8 @@ if __name__ == "__main__":
     title = "Reconstruction error over time"
     log_title = "Reconstruction error over time - Log scale"
     if epsilon != 0.0:
-        title += "$\epsilon$ = {}".format(epsilon)
-        log_title += "$\epsilon$ = {}".format(epsilon)
+        title += " $\epsilon$ = {}".format(epsilon)
+        log_title += " $\epsilon$ = {}".format(epsilon)
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
