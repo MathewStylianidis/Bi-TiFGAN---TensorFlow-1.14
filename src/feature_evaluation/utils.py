@@ -53,8 +53,8 @@ def get_avg_reconstruction_error(Z, checkpoint_tuples, epsilon=0.0, batch_size=6
 
                 cum_rec_error = 0
                 for i in range(0, len(Z), batch_size):
-                    z_batch = Z[i:i + batch_size] + epsilon
-                    x_batch = sess.run(biwgan._net.X_fake, feed_dict={biwgan._net.z: z_batch})
+                    z_batch = Z[i:i + batch_size]
+                    x_batch = sess.run(biwgan._net.X_fake, feed_dict={biwgan._net.z: z_batch + epsilon})
                     z_batch_hat = sess.run(biwgan._net.z_real, feed_dict={biwgan._net.X_real: x_batch})
                     # Compute sum of absolute errors for all latent samples
                     cum_rec_error += np.sum(np.abs(z_batch - z_batch_hat), axis=1).sum()
@@ -65,7 +65,25 @@ def get_avg_reconstruction_error(Z, checkpoint_tuples, epsilon=0.0, batch_size=6
     return avg_reconstruction_error
 
 
+def load_data_labels(labels_path):
+    """ Loads the label identifiers for all dataset samples.
 
+    Args:
+        labels_path: The path to the directory with the stored labels.
+
+    Returns:
+        A numpy array with the dataset labels.
+
+    """
+    files = os.listdir(labels_path)
+    Y = []
+    for file in tqdm(files):
+        if not file.endswith(".npy"):
+            continue
+        file_path = os.path.join(labels_path, file)
+        Y.append(np.load(file_path).reshape((-1, 1)))
+    Y = np.vstack(Y).flatten()
+    return Y
 
 
 

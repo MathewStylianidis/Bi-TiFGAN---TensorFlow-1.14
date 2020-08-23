@@ -20,7 +20,9 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+from feature_evaluation.utils import load_data_labels
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 DEFAULT_NAME = "wgan"
@@ -62,27 +64,6 @@ def get_arguments():
     parser.add_argument("--model-name", type=str, required=False, default=DEFAULT_NAME,
                         help="The name of the trained model included in the checkpoint file names.")
     return parser.parse_args()
-
-
-def load_data_labels(labels_path):
-    """ Loads the label identifiers for all dataset samples.
-
-    Args:
-        labels_path: The path to the directory with the stored labels.
-
-    Returns:
-        A numpy array with the dataset labels.
-
-    """
-    files = os.listdir(labels_path)
-    Y = []
-    for file in tqdm(files):
-        if not file.endswith(".npy"):
-            continue
-        file_path = os.path.join(labels_path, file)
-        Y.append(np.load(file_path).reshape((-1, 1)))
-    Y = np.vstack(Y).flatten()
-    return Y
 
 
 def get_checkpoint_paths(checkpoints_dir, name):
