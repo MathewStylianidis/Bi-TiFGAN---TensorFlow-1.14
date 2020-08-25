@@ -27,7 +27,7 @@ def get_avg_reconstruction_error(Z, checkpoint_tuples, epsilon=0.0, batch_size=6
         epsilon (float): A number to be added to the latent samples before feeding them to the generator. This
             argument can be set to small non zero values to evaluate the smoothness of the function learned by
             the generator and the encoder. Defaults to 0.0.
-        batch_size (float): The number of latent to feed each time in parallel to the generator and encoder.
+        batch_size (int): The number of latent to feed each time in parallel to the generator and encoder.
 
     Returns:
         A dictionary where the key is the update step corresponding to a checkpoint and the value is the
