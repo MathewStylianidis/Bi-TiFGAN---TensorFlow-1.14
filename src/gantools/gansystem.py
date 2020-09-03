@@ -33,7 +33,7 @@ class GANsystem(NNSystem):
         d_param['optimization']['discriminator'] = deepcopy(d_opt)
         d_param['optimization']['generator'] = deepcopy(d_opt)
         d_param['optimization']['encoder'] = deepcopy(d_opt)
-        d_param['optimization']['n_critic'] = 5
+        d_param['optimization']['n_critic'] = 5 
         d_param['optimization']['epoch'] = 10
         d_param['optimization']['batch_size'] = 8
         d_param['Nstats'] = None
@@ -53,7 +53,7 @@ class GANsystem(NNSystem):
         the requirements of the class model.
         """
         super().__init__(model=model, params=params, name=name)
-  
+
 
     def _add_optimizer(self):
 
@@ -76,12 +76,15 @@ class GANsystem(NNSystem):
                 params = self.params['optimization'][varsuffix]
                 print(yaml.dump(params))
                 optimizer = self.build_optmizer(params)
-                grads_and_vars = optimizer.compute_gradients(losses[index], var_list=s_vars)
-                apply_opt = optimizer.apply_gradients(grads_and_vars)
-                self._optimize.append(tf.group(apply_opt, *self.net.constraints))
+                gradients, variables = optimizer.compute_gradients(losses[index], var_list=s_vars)
 
+                if self.params["optimization"]["clip_grads"]:
+                    gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
+
+                apply_opt = optimizer.apply_gradients(zip(gradients, variables))
+                self._optimize.append(tf.group(apply_opt, *self.net.constraints))
                 # Summaries
-                grad_norms = [tf.nn.l2_loss(g[0])*2 for g in grads_and_vars]
+                grad_norms = [tf.nn.l2_loss(g)*2 for g in gradients]
                 grad_norm = [tf.reduce_sum(grads) for grads in grad_norms]
                 final_grad = tf.sqrt(tf.reduce_sum(grad_norm))
                 tf.summary.scalar(varsuffix+"/Gradient_Norm", final_grad, collections=["train"])
@@ -90,6 +93,7 @@ class GANsystem(NNSystem):
                 #    learning_rate = self.params['optimization'][varsuffix]['learning_rate']
                 #    optim_learning_rate = learning_rate*(tf.sqrt(1 - beta2_power) /(1 - beta1_power))
                 #    tf.summary.scalar(varsuffix+'/ADAM_learning_rate', optim_learning_rate, collections=["train"])
+
 
     @staticmethod
     def build_optmizer(params):
@@ -120,6 +124,7 @@ class GANsystem(NNSystem):
         super().train(dataset, **kwargs)
 
     def _run_optimization(self, feed_dict, idx):
+
         # Update discriminator
         for _ in range(self.params['optimization']['n_critic']):
             _, loss_d = self._sess.run([self._optimize[0], self.net.loss[0]], feed_dict=feed_dict)
@@ -136,6 +141,7 @@ class GANsystem(NNSystem):
             self._epoch_loss_disc = 0
             self._epoch_loss_gen = 0
             self._epoch_loss_encoder = 0
+
         self._epoch_loss_disc += curr_loss[0]
         self._epoch_loss_gen += curr_loss[1]
         self._epoch_loss_encoder += curr_loss[2]
@@ -388,6 +394,7 @@ class PaulinaGANsystem(GANsystem):
         feed_dict[self.worst_minmax_pl] = worst_minmax
         feed_dict[self.worst_maxmin_pl] = worst_maxmin
         super()._train_log(feed_dict)
+
 
 class UpcaleGANsystem(GANsystem):
 
