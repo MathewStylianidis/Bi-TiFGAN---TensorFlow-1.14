@@ -141,13 +141,13 @@ class BiWGAN(BaseGAN):
         # Wasserstein loss
         gamma_gp = self.params['gamma_gp']
         print(' Wasserstein loss with gamma_gp={}'.format(gamma_gp))
-        self._D_gp = 0 #self.wgan_regularization(gamma_gp, [self.X_fake], [self.X_real], [self.z], [self.z_real])
+        self._D_gp = self.wgan_regularization(gamma_gp, [self.X_fake], [self.X_real], [self.z], [self.z_real])
         self._D_loss = -(self._D_loss_r - self._D_loss_f) + self._D_gp
         self._G_loss = -self._D_loss_f
         self._E_loss = self._D_loss_r
 
-        self._inputs = (self.z)
-        self._outputs = (self.X_fake)
+        self._inputs = self.z
+        self._outputs = self.X_fake
 
     def _add_summary(self):
         tf.summary.histogram('Prior/z', self.z, collections=['model'])
@@ -326,12 +326,13 @@ class BiWGAN(BaseGAN):
     def data_size(self):
         return self._data_size
 
+
 class BiSpectrogramGAN(BiWGAN):
     def default_params(self):
         d_params = super().default_params()
         d_params['generator']['consistency_contribution'] = 0
         return d_params
-    
+
     def substractMeanAndDivideByStd(self, aDistribution):
         unmeaned = aDistribution -tf.reduce_mean(aDistribution, axis=(1, 2), keep_dims=True)     
         shiftedtt = unmeaned/tf.sqrt(tf.reduce_sum(tf.square(tf.abs(unmeaned)), axis=(1, 2), keep_dims=True))
