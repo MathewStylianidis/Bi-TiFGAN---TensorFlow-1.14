@@ -76,7 +76,7 @@ class GANsystem(NNSystem):
                 params = self.params['optimization'][varsuffix]
                 print(yaml.dump(params))
                 optimizer = self.build_optmizer(params)
-                gradients, variables = optimizer.compute_gradients(losses[index], var_list=s_vars)
+                gradients, variables = zip(*optimizer.compute_gradients(losses[index], var_list=s_vars))
 
                 if self.params["optimization"]["clip_grads"]:
                     gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
