@@ -105,6 +105,7 @@ class NNSystem(object):
                 self._time['prev_iter_time'] = self._time['start_time']
 
                 print('Start training')
+                self._save(0)
                 while self._epoch < self._n_epoch:
                     epoch_loss = 0.
                     for idx, batch in enumerate(
