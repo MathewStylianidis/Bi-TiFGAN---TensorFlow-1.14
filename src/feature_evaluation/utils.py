@@ -86,5 +86,17 @@ def load_data_labels(labels_path):
     return Y
 
 
+def load_data(dataset_path):
+    files = os.listdir(dataset_path)
+    print("Loading data")
+    X = []
+    for file in tqdm(files):
+        if not file.endswith(".npz"):
+            continue
+        file_path = os.path.join(dataset_path, file)
+        X.append(np.load(file_path)['logspecs'][:, :256])
+    X = np.vstack(X)[..., np.newaxis]
+    return X
+
 
 

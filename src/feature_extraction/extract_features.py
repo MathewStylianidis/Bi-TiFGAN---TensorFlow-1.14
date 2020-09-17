@@ -19,11 +19,13 @@ from gantools.model import BiSpectrogramGAN
 from gantools.data.Dataset import Dataset
 from gantools.gansystem import GANsystem
 from hyperparams.tifgan_hyperparams import get_hyperparams
+from feature_evaluation.utils import load_data
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 name = 'commands_md64_8k'
 batch_size = 64
+
 
 def get_arguments():
     """Parse all the arguments provided from the CLI.
@@ -50,16 +52,7 @@ if __name__ == "__main__":
     checkpoint_step = args.checkpoint_step
     features_path = args.features_path
 
-    files = os.listdir(dataset_path)
-    print(len(files))
-    print("Loading data")
-    X = []
-    for file in tqdm(files):
-        if not file.endswith(".npz"):
-            continue
-        file_path = os.path.join(dataset_path, file)
-        X.append(np.load(file_path)['logspecs'][:, :256])
-    X = np.vstack(X)[..., np.newaxis]
+    X = load_data(dataset_path)
 
     with tf.device('/gpu:0'):
         params = get_hyperparams(results_dir, name)

@@ -4,7 +4,7 @@ import os
 from gantools import blocks
 
 
-def get_hyperparams(result_path=None, name=None):
+def get_hyperparams(result_path=None, name=None, bidirectional=True):
     """ Defines the dictionary of the parameters for the bi-directional TiF-GAN.
 
         This function creates and returns a dictionary with the parameters for the
@@ -15,6 +15,8 @@ def get_hyperparams(result_path=None, name=None):
     Args:
         result_path (str): The directory where checkpoints and event summaries are saved.
         name (str): The name of the model.
+        bidirectional (bool): If set to False then the hyperparameters for a simple TiFGAN
+            will be returned rather than a BiTiFGAN.
 
     Returns:
         The dictionary with the bi-directional tif-gan hyperparameters.
@@ -30,14 +32,15 @@ def get_hyperparams(result_path=None, name=None):
     params = dict()
     params['net'] = dict()  # All the parameters for the model
     params['net']['generator'] = get_generator_hyperparams(latent_dim, md, bn)
-    params['net']['discriminator'] = get_discriminator_hyperparams(md, bn)
-    params['net']['encoder'] = get_encoder_hyperparams(latent_dim, md, bn, input_shape)
+    params['net']['discriminator'] = get_discriminator_hyperparams(md, bn, bidirectional)
+    if bidirectional:
+        params['net']['encoder'] = get_encoder_hyperparams(latent_dim, md, bn, input_shape)
     params['net']['prior_distribution'] = 'gaussian'
     params['net']['shape'] = input_shape  # Shape of the image
     params['net']['gamma_gp'] = 10  # Gradient penalty
     params['net']['fs'] = 16000 // downscale
 
-    params['optimization'] = get_optimization_hyperparams(batch_size=batch_size)
+    params['optimization'] = get_optimization_hyperparams(batch_size, bidirectional)
     params['summary_every'] = 100  # Tensorboard summaries every ** iterations
     params['print_every'] = 100  # Console summaries every ** iterations
     params['save_every'] = 2000  # Save the model every ** iterations
@@ -47,7 +50,7 @@ def get_hyperparams(result_path=None, name=None):
     return params
 
 
-def get_optimization_hyperparams(batch_size):
+def get_optimization_hyperparams(batch_size, bidirectional):
     """ Gets the optimization hyperparameters for the GAN training.
 
     Gets a dictionary with the optimization hyperparameters such as the type of the
@@ -56,6 +59,8 @@ def get_optimization_hyperparams(batch_size):
 
     Args:
         batch_size (int): Batch size to be used for training.
+        bidirectional (bool): If set to False then the hyperparameters for a simple TiFGAN
+            will be returned rather than a BiTiFGAN.
 
     Returns:
         A dictionary with the optimization hyperparameters.
@@ -64,6 +69,7 @@ def get_optimization_hyperparams(batch_size):
     params_optimization['batch_size'] = batch_size
     params_optimization['epoch'] = 10000
     params_optimization['n_critic'] = 5
+    params_optimization["clip_grads"] = True
     params_optimization['generator'] = dict()
     params_optimization['generator']['optimizer'] = 'adam'
     params_optimization['generator']['kwargs'] = {'beta1': 0.5, 'beta2': 0.9}
@@ -72,10 +78,11 @@ def get_optimization_hyperparams(batch_size):
     params_optimization['discriminator']['optimizer'] = 'adam'
     params_optimization['discriminator']['kwargs'] = {'beta1': 0.5, 'beta2': 0.9}
     params_optimization['discriminator']['learning_rate'] = 1e-4
-    params_optimization['encoder'] = dict()
-    params_optimization['encoder']['optimizer'] = 'adam'
-    params_optimization['encoder']['kwargs'] = {'beta1': 0.5, 'beta2': 0.9}
-    params_optimization['encoder']['learning_rate'] = 1e-4
+    if bidirectional:
+        params_optimization['encoder'] = dict()
+        params_optimization['encoder']['optimizer'] = 'adam'
+        params_optimization['encoder']['kwargs'] = {'beta1': 0.5, 'beta2': 0.9}
+        params_optimization['encoder']['learning_rate'] = 1e-4
     return params_optimization
 
 
@@ -107,12 +114,14 @@ def get_generator_hyperparams(latent_dim, md, bn):
     return params_generator
 
 
-def get_discriminator_hyperparams(md, bn):
+def get_discriminator_hyperparams(md, bn, bidirectional):
     """ Gets a dictionary with the discriminator hyperparameters.
 
     Args:
         md: Determine the number of filters per convolutional layer.
         bn: Whether to use batch normalization or not.
+        bidirectional (bool): If set to False then the hyperparameters for a simple TiFGAN
+            will be returned rather than a BiTiFGAN.
 
     Returns:
         A dictionary determining the discriminator hyperparameters for its architecture design.
@@ -122,9 +131,10 @@ def get_discriminator_hyperparams(md, bn):
     params_discriminator['nfilter'] = [md, 2 * md, 4 * md, 8 * md, 16 * md]
     params_discriminator['shape'] = [[12, 3], [12, 3], [12, 3], [12, 3], [12, 3]]
     params_discriminator['batch_norm'] = [bn, bn, bn, bn, bn]
-    params_discriminator['latent_full'] = [50]
-    params_discriminator['latent_activation'] = blocks.lrelu
-    params_discriminator['full'] = []
+    if bidirectional:
+        params_discriminator['latent_full'] = [50]  # 256
+        params_discriminator['latent_activation'] = blocks.lrelu
+    params_discriminator['full'] = []  # TODO: 516
     params_discriminator['minibatch_reg'] = False
     params_discriminator['summary'] = True
     params_discriminator['data_size'] = 2

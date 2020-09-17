@@ -79,13 +79,13 @@ class GANsystem(NNSystem):
                 gradients, variables = zip(*optimizer.compute_gradients(losses[index], var_list=s_vars))
 
                 if self.params["optimization"]["clip_grads"]:
-                    gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
+                    gradients, _ = tf.clip_by_global_norm(gradients, 60.0)
 
                 apply_opt = optimizer.apply_gradients(zip(gradients, variables))
                 self._optimize.append(tf.group(apply_opt, *self.net.constraints))
                 # Summaries
                 grad_norms = [tf.nn.l2_loss(g)*2 for g in gradients]
-                grad_norm = [tf.reduce_sum(grads) for grads in grad_norms]
+                grad_norm = [tf.reduce_sum(grads) for grads in grad_norms] #TODO: Take mean
                 final_grad = tf.sqrt(tf.reduce_sum(grad_norm))
                 tf.summary.scalar(varsuffix+"/Gradient_Norm", final_grad, collections=["train"])
                 #if self.params['optimization'][varsuffix]['optimizer'] == 'adam':

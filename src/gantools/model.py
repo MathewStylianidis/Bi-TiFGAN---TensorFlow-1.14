@@ -53,6 +53,273 @@ class BaseGAN(BaseNet):
         raise NotImplementedError("This is a an abstract class.")
 
 
+class WGAN(BaseGAN):
+    def default_params(self):
+        d_params = deepcopy(super().default_params())
+        d_params['shape'] = [16, 16, 1]  # Shape of the image
+        d_params['prior_distribution'] = 'gaussian'  # prior distribution
+        d_params['gamma_gp'] = 10
+        d_params['loss_type'] = 'wasserstein'  # 'hinge' or 'wasserstein'
+
+        bn = False
+
+        d_params['generator'] = dict()
+        d_params['generator']['latent_dim'] = 100
+        d_params['generator']['full'] = [2 * 8 * 8]
+        d_params['generator']['nfilter'] = [2, 32, 32, 1]
+        d_params['generator']['batch_norm'] = [bn, bn, bn]
+        d_params['generator']['shape'] = [[5, 5], [5, 5], [5, 5], [5, 5]]
+        d_params['generator']['stride'] = [1, 2, 1, 1]
+        d_params['generator']['summary'] = True
+        d_params['generator']['data_size'] = 2  # 1 for 1D signal, 2 for images, 3 for 3D
+        d_params['generator']['inception'] = False  # Use inception module
+        d_params['generator']['residual'] = False  # Use residual connections
+        d_params['generator']['activation'] = lrelu  # leaky relu
+        d_params['generator']['one_pixel_mapping'] = []  # One pixel mapping
+        d_params['generator']['non_lin'] = tf.nn.relu  # non linearity at the end of the generator
+        d_params['generator']['spectral_norm'] = False  # use spectral norm
+
+        d_params['discriminator'] = dict()
+        d_params['discriminator']['full'] = [32]
+        d_params['discriminator']['nfilter'] = [16, 32, 32, 32]
+        d_params['discriminator']['batch_norm'] = [bn, bn, bn, bn]
+        d_params['discriminator']['shape'] = [[5, 5], [5, 5], [5, 5], [3, 3]]
+        d_params['discriminator']['stride'] = [2, 2, 2, 1]
+        d_params['discriminator']['summary'] = True
+        d_params['discriminator']['data_size'] = 2  # 1 for 1D signal, 2 for images, 3 for 3D
+        d_params['discriminator']['inception'] = False  # Use inception module
+        d_params['discriminator']['activation'] = lrelu  # leaky relu
+        d_params['discriminator']['one_pixel_mapping'] = []  # One pixel mapping
+        d_params['discriminator']['non_lin'] = None  # non linearity at the beginning of the discriminator
+        d_params['discriminator']['cdf'] = None  # cdf
+        d_params['discriminator']['cdf_block'] = None  # non linearity at the beginning of the discriminator
+        d_params['discriminator']['moment'] = None  # non linearity at the beginning of the discriminator
+        d_params['discriminator']['minibatch_reg'] = False  # Use minibatch regularization
+        d_params['discriminator']['spectral_norm'] = False  # use spectral norm
+
+        return d_params
+
+    def __init__(self, params, name='wgan'):
+        super().__init__(params=params, name=name)
+        self._summary = tf.summary.merge(tf.get_collection("model"))
+
+    def _build_generator(self):
+        shape = self._params['shape']
+        self.X_real = tf.placeholder(tf.float32, shape=[None, *shape], name='Xreal')
+        self.z = tf.placeholder(
+            tf.float32,
+            shape=[None, self.params['generator']['latent_dim']],
+            name='z')
+        self.X_fake = self.generator(self.z, reuse=False)
+
+    def _build_net(self):
+        self._data_size = self.params['generator']['data_size']
+        assert (self.params['discriminator']['data_size'] == self.data_size)
+
+        reduction = stride2reduction(self.params['generator']['stride'])
+        if 'in_conv_shape' not in self.params['generator'].keys():
+            in_conv_shape = [el // reduction for el in self.params['shape'][:-1]]
+            self._params['generator']['in_conv_shape'] = in_conv_shape
+
+        self._build_generator()
+        self._D_fake, self.discr_features_fake = self.discriminator(self.X_fake, reuse=False, return_features=True)
+        self._D_real, self.discr_features_real = self.discriminator(self.X_real, reuse=True, return_features=True)
+        self._D_loss_f = tf.reduce_mean(self._D_fake)
+        self._D_loss_r = tf.reduce_mean(self._D_real)
+
+        if self.params['loss_type'] == 'wasserstein':
+            # Wasserstein loss
+            gamma_gp = self.params['gamma_gp']
+            print(' Wasserstein loss with gamma_gp={}'.format(gamma_gp))
+            self._D_gp = self.wgan_regularization(gamma_gp, [self.X_fake], [self.X_real])
+            self._D_loss = -(self._D_loss_r - self._D_loss_f) + self._D_gp
+            self._G_loss = -self._D_loss_f
+        elif self.params['loss_type'] == 'normalized_wasserstein':  # Wasserstein loss
+            gamma_gp = self.params['gamma_gp']
+            print(' Normalized Wasserstein loss with gamma_gp={}'.format(gamma_gp))
+            self._D_gp = self.wgan_regularization(gamma_gp, [self.X_fake], [self.X_real])
+            reg = tf.nn.relu(self._D_loss_r * self._D_loss_f)
+            self._D_loss = -(self._D_loss_r - self._D_loss_f) + self._D_gp + reg
+            self._G_loss = -self._D_loss_f
+            tf.summary.scalar("Disc/reg", reg, collections=["train"])
+        elif self.params['loss_type'] == 'hinge':
+            # Hinge loss
+            print(' Hinge loss.')
+            self._D_loss = tf.nn.relu(1 - self._D_loss_r) + tf.nn.relu(self._D_loss_f + 1)
+            self._G_loss = -self._D_loss_f
+        else:
+            raise ValueError('Unknown loss type!')
+        self._inputs = (self.z)
+        self._outputs = (self.X_fake)
+
+    def _add_summary(self):
+        tf.summary.histogram('Prior/z', self.z, collections=['model'])
+        self._build_image_summary()
+        self._build_stat_summary()
+        self._wgan_summaries()
+
+    def generator(self, z, **kwargs):
+        return generator(z, params=self.params['generator'], **kwargs)
+
+    def discriminator(self, X, **kwargs):
+        return discriminator(X, params=self.params['discriminator'], **kwargs)
+
+    def sample_latent(self, bs=1):
+        latent_dim = self.params['generator']['latent_dim']
+        return utils.sample_latent(bs, latent_dim, self._params['prior_distribution'])
+
+    def wgan_regularization(self, gamma, list_fake, list_real):
+        if not gamma:
+            # I am not sure this part or the code is still useful
+            t_vars = tf.trainable_variables()
+            d_vars = [var for var in t_vars if 'discriminator' in var.name]
+            D_clip = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in d_vars]
+            self._constraints.append(D_clip)
+            D_gp = tf.constant(0, dtype=tf.float32)
+            print(" [!] Using weight clipping")
+        else:
+            # calculate `x_hat`
+            assert (len(list_fake) == len(list_real))
+            bs = tf.shape(list_fake[0])[0]
+            eps = tf.random_uniform(shape=[bs], minval=0, maxval=1)
+
+            x_hat = []
+            for fake, real in zip(list_fake, list_real):
+                singledim = [1] * (len(fake.shape.as_list()) - 1)
+                eps = tf.reshape(eps, shape=[bs, *singledim])
+                x_hat.append(eps * real + (1.0 - eps) * fake)
+
+            D_x_hat = self.discriminator(*x_hat, reuse=True)
+
+            # gradient penalty
+            gradients = tf.gradients(D_x_hat, x_hat)
+            norm_gradient_pen = tf.norm(gradients[0], ord=2)
+            D_gp = gamma * tf.square(norm_gradient_pen - 1.0)
+            tf.summary.scalar("Disc/GradPen", D_gp, collections=["train"])
+            tf.summary.scalar("Disc/NormGradientPen", norm_gradient_pen, collections=["train"])
+            print(" Using gradients penalty")
+
+        return D_gp
+
+    def _wgan_summaries(self):
+        tf.summary.scalar("Disc/Neg_Loss", -self._D_loss, collections=["train"])
+        tf.summary.scalar("Disc/Neg_Critic", self._D_loss_f - self._D_loss_r, collections=["train"])
+        tf.summary.scalar("Disc/Loss_f", self._D_loss_f, collections=["train"])
+        tf.summary.scalar("Disc/Loss_r", self._D_loss_r, collections=["train"])
+        tf.summary.scalar("Gen/Loss", self._G_loss, collections=["train"])
+
+    def _build_stat_summary(self):
+        self._stat_list_real = ganlist.gan_stat_list('real')
+        self._stat_list_fake = ganlist.gan_stat_list('fake')
+
+        for stat in self._stat_list_real:
+            stat.add_summary(collections="model")
+
+        for stat in self._stat_list_fake:
+            stat.add_summary(collections="model")
+
+        self._metric_list = ganlist.gan_metric_list(size=self.data_size)
+        for met in self._metric_list:
+            met.add_summary(collections="model")
+
+    def preprocess_summaries(self, X_real, **kwargs):
+        for met in self._metric_list:
+            met.preprocess(X_real, **kwargs)
+
+    def compute_summaries(self, X_real, X_fake, feed_dict={}):
+        for stat in self._stat_list_real:
+            feed_dict = stat.compute_summary(X_real, feed_dict)
+        for stat in self._stat_list_fake:
+            feed_dict = stat.compute_summary(X_fake, feed_dict)
+        for met in self._metric_list:
+            feed_dict = met.compute_summary(X_fake, X_real, feed_dict)
+        if self.data_size == 1:
+            feed_dict = self._plot_real.compute_summary(np.squeeze(X_real), feed_dict=feed_dict)
+            feed_dict = self._plot_fake.compute_summary(np.squeeze(X_fake), feed_dict=feed_dict)
+        return feed_dict
+
+    def _build_image_summary(self):
+        vmin = tf.reduce_min(self.X_real)
+        vmax = tf.reduce_max(self.X_real)
+        if self.data_size == 3:
+            X_real = utils.tf_cube_slices(self.X_real)
+            X_fake = utils.tf_cube_slices(self.X_fake)
+            # Plot some slices
+            sl = self.X_real.shape[3] // 2
+            tf.summary.image(
+                "images/Real_Image_slice_middle",
+                colorize(self.X_real[:, :, :, sl, :], vmin, vmax),
+                max_outputs=4,
+                collections=['model'])
+            tf.summary.image(
+                "images/Fake_Image_slice_middle",
+                colorize(self.X_fake[:, :, :, sl, :], vmin, vmax),
+                max_outputs=4,
+                collections=['model'])
+            sl = self.X_real.shape[3] - 1
+            tf.summary.image(
+                "images/Real_Image_slice_end",
+                colorize(self.X_real[:, :, :, sl, :], vmin, vmax),
+                max_outputs=4,
+                collections=['model'])
+            tf.summary.image(
+                "images/Fake_Image_slice_end",
+                colorize(self.X_fake[:, :, :, sl, :], vmin, vmax),
+                max_outputs=4,
+                collections=['model'])
+            sl = (self.X_real.shape[3] * 3) // 4
+            tf.summary.image(
+                "images/Real_Image_slice_3/4",
+                colorize(self.X_real[:, :, :, sl, :], vmin, vmax),
+                max_outputs=4,
+                collections=['model'])
+            tf.summary.image(
+                "images/Fake_Image_slice_3/4",
+                colorize(self.X_fake[:, :, :, sl, :], vmin, vmax),
+                max_outputs=4,
+                collections=['model'])
+        elif self.data_size == 2:
+            X_real = self.X_real
+            X_fake = self.X_fake
+        elif self.data_size == 1:
+            self._plot_real = PlotSummaryPlot(4, 4, "real", "signals", collections=['model'])
+            self._plot_fake = PlotSummaryPlot(4, 4, "fake", "signals", collections=['model'])
+            fs = self.params.get('fs', 16000)
+            tf.summary.audio(
+                'audio/Real', self.X_real, fs, max_outputs=4, collections=['model'])
+            tf.summary.audio(
+                'audio/Fake', self.X_fake, fs, max_outputs=4, collections=['model'])
+            return None
+        tf.summary.image(
+            "images/Real_Image",
+            colorize(X_real, vmin, vmax),
+            max_outputs=4,
+            collections=['model'])
+        tf.summary.image(
+            "images/Fake_Image",
+            colorize(X_fake, vmin, vmax),
+            max_outputs=4,
+            collections=['model'])
+
+    def assert_image(self, x):
+        dim = self.data_size + 1
+        if len(x.shape) < dim:
+            raise ValueError('The size of the data is wrong')
+        elif len(x.shape) < (dim + 1):
+            x = np.expand_dims(x, dim)
+        return x
+
+    def batch2dict(self, batch):
+        d = dict()
+        d['X_real'] = self.assert_image(batch)
+        d['z'] = self.sample_latent(len(batch))
+        return d
+
+    @property
+    def data_size(self):
+        return self._data_size
+
+
 class BiWGAN(BaseGAN):
     def __init__(self, params, name='wgan'):
         self._E_loss = None
@@ -325,6 +592,81 @@ class BiWGAN(BaseGAN):
     @property
     def data_size(self):
         return self._data_size
+
+
+class SpectrogramGAN(WGAN):
+    def default_params(self):
+        d_params = super().default_params()
+        d_params['generator']['consistency_contribution'] = 0
+        return d_params
+
+    def substractMeanAndDivideByStd(self, aDistribution):
+        unmeaned = aDistribution - tf.reduce_mean(aDistribution, axis=(1, 2), keep_dims=True)
+        shiftedtt = unmeaned / tf.sqrt(tf.reduce_sum(tf.square(tf.abs(unmeaned)), axis=(1, 2), keep_dims=True))
+        return shiftedtt
+
+    def consistency(self, spectrogram):
+        ttderiv = spectrogram[:, 1:-1, :-2] - 2 * spectrogram[:, 1:-1, 1:-1] + spectrogram[:, 1:-1, 2:] + tf.constant(
+            np.pi / 4)
+        ffderiv = spectrogram[:, :-2, 1:-1] - 2 * spectrogram[:, 1:-1, 1:-1] + spectrogram[:, 2:, 1:-1] + tf.constant(
+            np.pi / 4)
+
+        absttderiv = self.substractMeanAndDivideByStd(tf.abs(ttderiv))
+        absffderiv = self.substractMeanAndDivideByStd(tf.abs(ffderiv))
+
+        consistencies = tf.reduce_sum(absttderiv * absffderiv, axis=(1, 2))
+        return consistencies
+
+    def _build_net(self):
+        super()._build_net()
+        consistency_contribution = self._params['generator']['consistency_contribution']
+        print("consistency_contribution", consistency_contribution)
+        self._R_Con = self.consistency((self.X_real - 1) * 5)
+        self._F_Con = self.consistency((self.X_fake - 1) * 5)
+        self._mean_R_Con, self._std_R_Con = tf.nn.moments(self._R_Con, axes=[0])
+        self._mean_F_Con, self._std_F_Con = tf.nn.moments(self._F_Con, axes=[0])
+
+        self._mean_R_Con = tf.squeeze(self._mean_R_Con)
+        self._mean_F_Con = tf.squeeze(self._mean_F_Con)
+        self._std_R_Con = tf.squeeze(self._std_R_Con)
+        self._std_F_Con = tf.squeeze(self._std_F_Con)
+
+        self._G_Reg = tf.abs(self._mean_R_Con - self._mean_F_Con)
+        self._G_loss += consistency_contribution * self._G_Reg
+
+    def _wgan_summaries(self):
+        super()._wgan_summaries()
+        tf.summary.scalar("Gen/Reg", self._G_Reg, collections=["train"])
+        tf.summary.scalar("Gen/R_Con", self._mean_R_Con, collections=["train"])
+        tf.summary.scalar("Gen/F_Con", self._mean_F_Con, collections=["train"])
+
+        tf.summary.scalar("Gen/STD_diff", tf.abs(self._std_R_Con - self._std_F_Con), collections=["train"])
+        tf.summary.scalar("Gen/R_STD_Con", self._std_R_Con, collections=["train"])
+        tf.summary.scalar("Gen/F_STD_Con", self._std_F_Con, collections=["train"])
+
+
+class DiffSpectrogramGAN(SpectrogramGAN):
+    def secondDerivs(self, spectrogram):
+        ttderiv = spectrogram[:, 1:-1, :-2] - 2 * spectrogram[:, 1:-1, 1:-1] + spectrogram[:, 1:-1, 2:] + tf.constant(
+            np.pi / 4)
+        ffderiv = spectrogram[:, :-2, 1:-1] - 2 * spectrogram[:, 1:-1, 1:-1] + spectrogram[:, 2:, 1:-1] + tf.constant(
+            np.pi / 4)
+        normalizedttderiv = (ttderiv - 3) / 10
+        normalizedffderiv = (ffderiv - 3) / 10
+        return tf.pad(normalizedttderiv, [[0, 0], [1, 1, ], [1, 1], [0, 0]]), tf.pad(normalizedffderiv,
+                                                                                     [[0, 0], [1, 1, ], [1, 1], [0, 0]])
+
+    def firstDerivs(self, spectrogram):
+        tderiv = (spectrogram[:, 1:-1, 2:] - spectrogram[:, 1:-1, :-2]) / 2
+        fderiv = (spectrogram[:, 2:, 1:-1] - spectrogram[:, :-2, 1:-1]) / 2
+        normalizedtderiv = tderiv / 4
+        normalizedfderiv = fderiv / 4
+        return tf.pad(normalizedtderiv, [[0, 0], [1, 1, ], [1, 1], [0, 0]]), tf.pad(normalizedfderiv,
+                                                                                    [[0, 0], [1, 1, ], [1, 1], [0, 0]])
+
+    def discriminator(self, X, **kwargs):
+        return discriminator(tf.concat([X, *self.firstDerivs((X - 1) * 5), *self.secondDerivs((X - 1) * 5)], axis=-1),
+                             params=self.params['discriminator'], **kwargs)
 
 
 class BiSpectrogramGAN(BiWGAN):
@@ -1904,7 +2246,7 @@ def histogram_block(x, params, reuse):
     return hist
 
 
-def discriminator(x, z, params, reuse=True, scope="discriminator"):
+def discriminator(x, z=None, params=None, reuse=True, scope="discriminator", return_features=True):
     conv = get_conv(params['data_size'])
 
     assert(len(params['stride']) ==
@@ -1912,7 +2254,8 @@ def discriminator(x, z, params, reuse=True, scope="discriminator"):
            len(params['batch_norm']))
     nconv = len(params['stride'])
     nfull = len(params['full'])
-    nfull_latent = len(params['latent_full'])
+    if z is not None:
+        nfull_latent = len(params['latent_full'])
 
 
     for it, st in enumerate(params['stride']):
@@ -1922,7 +2265,8 @@ def discriminator(x, z, params, reuse=True, scope="discriminator"):
     with tf.variable_scope(scope, reuse=reuse):
         rprint('Discriminator \n'+''.join(['-']*50), reuse)
         rprint('     The data input is of size {}'.format(x.shape), reuse)
-        rprint('     The latent variable input is of size {}'.format(z.shape), reuse)
+        if z is not None:
+            rprint('     The latent variable input is of size {}'.format(z.shape), reuse)
 
         if len(params['one_pixel_mapping']):
             x = one_pixel_mapping(x,
@@ -1956,14 +2300,16 @@ def discriminator(x, z, params, reuse=True, scope="discriminator"):
             rprint('         Size of the CDF variables: {}'.format(cov.shape), reuse)
 
         # Adding dense layers on top of the latent variable with the specified activations
-        for i in range(nfull_latent):
-            z = linear(z,
-                       params['latent_full'][i],
-                       '{}_latent_full'.format(i + nfull_latent),
-                       summary=params['summary'])
-            z = params['latent_activation'](z)
-            rprint('     {} Latent full layer with {} outputs'.format(nconv + i, params['latent_full'][i]), reuse)
-            rprint('         Size of the variables: {}'.format(z.shape), reuse)
+        if z is not None:
+            for i in range(nfull_latent):
+                z = linear(z,
+                           params['latent_full'][i],
+                           '{}_latent_full'.format(i + nfull_latent),
+                           summary=params['summary'])
+                z = params['latent_activation'](z)
+                rprint('     {} Latent full layer with {} outputs'.format(nconv + i, params['latent_full'][i]), reuse)
+                rprint('         Size of the variables: {}'.format(z.shape), reuse)
+
 
         for i in range(nconv):
             # TODO: this really needs to be cleaned uy...
@@ -2022,6 +2368,9 @@ def discriminator(x, z, params, reuse=True, scope="discriminator"):
         x = reshape2d(x, name='img2vec')
         rprint('     Reshape to {}'.format(x.shape), reuse)
 
+        if return_features:
+            discr_features = x
+
         if z is not None:
             x = tf.concat([x, z], axis=1)
             rprint('     Contenate with latent variables to {}'.format(x.shape), reuse)
@@ -2054,6 +2403,10 @@ def discriminator(x, z, params, reuse=True, scope="discriminator"):
         rprint('     {} Full layer with {} outputs'.format(nconv+nfull, 1), reuse)
         rprint('     The output is of size {}'.format(x.shape), reuse)
         rprint(''.join(['-']*50)+'\n', reuse)
+
+    if return_features:
+        return x, discr_features
+
     return x
 
 
