@@ -77,3 +77,7 @@ We load each checkpoint from training and for each checkpoint we extract feature
 2. Smoothness test (Reconstruction error with an epsilon term added to the latent samples before feeding them to the generator)
 
         python -m feature_evaluation.reconstruction_test  --checkpoint-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan-results-sc09-run2-gp/commands_md64_8k_checkpoints/ --epsilon=1e-5
+	
+### 6. Extract TiFGAN discriminator features for a dataset
+
+    python -m feature_extraction.extract_discriminator_features --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data/ --checkpoint-step=99000 --results-dir="/media/datastore/c-matsty-data/checkpoints_summaries/tifgan_spectralnorm_sc09/" --features-path="../saved_discriminator_features" 
