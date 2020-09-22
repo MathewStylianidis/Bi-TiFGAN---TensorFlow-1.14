@@ -41,10 +41,13 @@ def get_arguments():
                         help="Directory containing the training results for the model.")
     parser.add_argument("--features-path", type=str, required=True,
                         help="Path where the extracted features will be saved.")
+    parser.add_argument("--selected-layer", type=int, required=False, default=-1,
+                        help="The index of the convolutional layer of the discriminator to use for extracting" +\
+                             "the features")
     return parser.parse_args()
 
 
-def extract_discriminator_features(X, results_dir, checkpoint_step, name, batch_size=64):
+def extract_discriminator_features(X, results_dir, checkpoint_step, name, selected_layer, batch_size=64):
     """ Loads a discriminator and extracts features for a given dataset
 
     Args:
@@ -52,6 +55,7 @@ def extract_discriminator_features(X, results_dir, checkpoint_step, name, batch_
         results_dir: Directory containing the training results for the model.
         checkpoint_step: Step of the checkpoint at which the Bi-TiF-GAN weights are saved.
         name: The name of the trained model used in the checkpoint filenames.
+        selected_layer: The index of the convolutional layer of the discriminator to use for extracting the features.
         batch_size: The number of images that will be processed at a time by the discriminator.
 
     Returns:
@@ -67,7 +71,8 @@ def extract_discriminator_features(X, results_dir, checkpoint_step, name, batch_
 
             for i in tqdm(range(0, len(X), batch_size)):
                 x_batch = X[i:i + batch_size]
-                feats = sess.run(tifgan._net.discr_features_real, feed_dict={tifgan._net.X_real: x_batch})
+                feats = sess.run(tifgan._net.discr_features_real[selected_layer],
+                                 feed_dict={tifgan._net.X_real: x_batch})
                 features.append(feats)
         features = np.vstack(features)
 
@@ -80,11 +85,12 @@ if __name__ == "__main__":
     results_dir = args.results_dir
     checkpoint_step = args.checkpoint_step
     features_path = args.features_path
+    selected_layer = args.selected_layer
 
     X = load_data(dataset_path)
 
-    features = extract_discriminator_features(X, results_dir, checkpoint_step, name)
-
+    features = extract_discriminator_features(X, results_dir, checkpoint_step, name, selected_layer)
+    print(features.shape)
     # Save features to designated path
     feat_dir_path = os.path.dirname(os.path.abspath(features_path))
     if not os.path.exists(feat_dir_path):

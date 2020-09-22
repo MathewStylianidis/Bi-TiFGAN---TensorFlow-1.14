@@ -405,6 +405,8 @@ class BiWGAN(BaseGAN):
         self._D_loss_f = tf.reduce_mean(self._D_fake)
         self._D_loss_r = tf.reduce_mean(self._D_real)
 
+
+
         # Wasserstein loss
         gamma_gp = self.params['gamma_gp']
         print(' Wasserstein loss with gamma_gp={}'.format(gamma_gp))
@@ -415,6 +417,9 @@ class BiWGAN(BaseGAN):
 
         self._inputs = self.z
         self._outputs = self.X_fake
+
+
+
 
     def _add_summary(self):
         tf.summary.histogram('Prior/z', self.z, collections=['model'])
@@ -2246,7 +2251,7 @@ def histogram_block(x, params, reuse):
     return hist
 
 
-def discriminator(x, z=None, params=None, reuse=True, scope="discriminator", return_features=True):
+def discriminator(x, z=None, params=None, reuse=True, scope="discriminator", return_features=False):
     conv = get_conv(params['data_size'])
 
     assert(len(params['stride']) ==
@@ -2310,7 +2315,7 @@ def discriminator(x, z=None, params=None, reuse=True, scope="discriminator", ret
                 rprint('     {} Latent full layer with {} outputs'.format(nconv + i, params['latent_full'][i]), reuse)
                 rprint('         Size of the variables: {}'.format(z.shape), reuse)
 
-
+        discr_features = []
         for i in range(nconv):
             # TODO: this really needs to be cleaned uy...
 
@@ -2363,13 +2368,13 @@ def discriminator(x, z=None, params=None, reuse=True, scope="discriminator", ret
                 rprint('         Batch norm', reuse)
             rprint('         Size of the variables: {}'.format(x.shape), reuse)
 
+            discr_features.append(x)
             x = params['activation'](x)
+
 
         x = reshape2d(x, name='img2vec')
         rprint('     Reshape to {}'.format(x.shape), reuse)
 
-        if return_features:
-            discr_features = x
 
         if z is not None:
             x = tf.concat([x, z], axis=1)
