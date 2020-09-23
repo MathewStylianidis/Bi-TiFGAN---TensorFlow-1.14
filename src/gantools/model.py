@@ -2367,9 +2367,8 @@ def discriminator(x, z=None, params=None, reuse=True, scope="discriminator", ret
                 x = batch_norm(x, name='{}_bn'.format(i), train=True)
                 rprint('         Batch norm', reuse)
             rprint('         Size of the variables: {}'.format(x.shape), reuse)
-
-            discr_features.append(x)
             x = params['activation'](x)
+            discr_features.append(x)
 
 
         x = reshape2d(x, name='img2vec')

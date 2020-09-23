@@ -11,7 +11,7 @@ from tqdm import tqdm
 from gantools import data
 from gantools import utils
 from gantools import plot
-from gantools.model import BiSpectrogramGAN
+from gantools.model import BiSpectrogramGAN, SpectrogramGAN
 from gantools.data.Dataset import Dataset
 from gantools.gansystem import GANsystem
 from gantools import blocks
@@ -67,6 +67,7 @@ def get_arguments():
                         help="Hop size when performing STFT on the signals.")
     parser.add_argument("--fft-window-length", type=str, default=DEFAULT_FFT_WINDOW_LEN,
                         help="Window size when performing STFT on the signals.")
+    parser.add_argument('--bidirectional', action='store_true')
     return parser.parse_args()
 
 
@@ -80,14 +81,18 @@ if __name__ == "__main__":
     fft_hop_size = args.fft_hop_size
     fft_window_length = args.fft_window_length
     L = args.fixed_len
+    bidirectional = args.bidirectional
 
     gen_samples_dir_path = os.path.join(gen_samples_dir_path, name)
     if not os.path.exists(gen_samples_dir_path):
         os.makedirs(gen_samples_dir_path)
 
     with tf.device('/gpu:0'):
-        params = get_hyperparams(results_dir, name)
-        biwgan = GANsystem(BiSpectrogramGAN, params)
+        params = get_hyperparams(results_dir, name, bidirectional=bidirectional)
+        if bidirectional:
+            gan = GANsystem(BiSpectrogramGAN, params)
+        else:
+            gan = GANsystem(SpectrogramGAN, params)
 
         nlatent = params["net"]["generator"]["latent_dim"]
 
@@ -95,9 +100,9 @@ if __name__ == "__main__":
         d2 = clip_dist2(nsamples, nlatent)
 
         with tf.Session() as sess:
-            biwgan.load(sess=sess, checkpoint=checkpoint_step)
+            gan.load(sess=sess, checkpoint=checkpoint_step)
 
-            X_fake = sess.run(biwgan._net.X_fake, feed_dict={biwgan._net.z: d2})
+            X_fake = sess.run(gan._net.X_fake, feed_dict={gan._net.z: d2})
 
             print("Generating samples")
             generated_spectrograms = np.squeeze(X_fake)
