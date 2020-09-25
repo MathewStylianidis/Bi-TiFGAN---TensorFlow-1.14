@@ -2,7 +2,9 @@ import sys
 import os
 
 import tensorflow as tf
+import numpy as np
 import argparse
+from tqdm import tqdm
 
 from gantools.model import SpectrogramGAN, encoder
 from gantools.gansystem import GANsystem
@@ -64,15 +66,22 @@ if __name__ == "__main__":
         # Build encoder
         # Define placeholder for variable z
         X_placeholder = tf.placeholder(tf.float32, shape=[None, *params["input_shape"]])
+        z_placeholder = tf.placeholder(tf.float32, shape=[None, 100])
         encoder_params = get_encoder_hyperparams(latent_dim, params["md"], params["bn"], params["input_shape"])
-        encoder = encoder(X_placeholder, encoder_params, reuse=False)
+        encoder_output = encoder(X_placeholder, encoder_params, reuse=False, scope="encoder")
+        # Set up loss
+        encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="encoder")
+        mse = tf.losses.mean_squared_error(z_placeholder, encoder_output)
+        encoder_opt = tf.train.AdamOptimizer(1e-4).minimize(mse, var_list=encoder_vars)
 
         with tf.Session() as sess:
             gan.load(sess=sess, checkpoint=checkpoint_step)
 
-            for i in range(update_steps):
+            print("Starting encoder training...")
+            for i in tqdm(range(update_steps)):
                 # Generate latent variables
-                d2 = clip_dist2(nsamples, nlatent)
+                z = clip_dist2(batch_size, latent_dim)
                 # Generate spectrograms
-                X_fake = sess.run(gan._net.X_fake, feed_dict={gan._net.z: d2})
+                X_fake = sess.run(gan._net.X_fake, feed_dict={gan._net.z: z})
                 # Train encoder to reconstruct spectrograms
+                loss = sess.run(encoder_opt, feed_dict={X_placeholder: X_fake, z_placeholder: z})
