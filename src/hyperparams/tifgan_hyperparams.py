@@ -41,6 +41,9 @@ def get_hyperparams(result_path=None, name=None, bidirectional=True):
     params['net']['fs'] = 16000 // downscale
 
     params['optimization'] = get_optimization_hyperparams(batch_size, bidirectional)
+    params['input_shape'] = input_shape
+    params['md'] = 64
+    params['bn'] = bn
     params['summary_every'] = 100  # Tensorboard summaries every ** iterations
     params['print_every'] = 100  # Console summaries every ** iterations
     params['save_every'] = 2000  # Save the model every ** iterations
