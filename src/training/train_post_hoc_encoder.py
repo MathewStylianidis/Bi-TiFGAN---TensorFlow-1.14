@@ -1,3 +1,8 @@
+"""
+ Generates samples using the latent prior and the generator and trains an encoder to
+ map those generated spectrograms back to the latent space.
+"""
+
 import sys
 import os
 
@@ -14,7 +19,7 @@ from hyperparams.tifgan_hyperparams import get_hyperparams, get_encoder_hyperpar
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 DEFAULT_ENCODER_PATH = os.path.join("..", "encoder_training_results")
 DEFAULT_NAME = "commands_md64_8k"
-DEFAULT_UPDATE_STEPS = 200000
+DEFAULT_UPDATE_STEPS = 500000
 DEFAULT_SAVE_EVERY = 1000
 DEFAULT_SUMMARY_EVERY = 50
 
@@ -80,12 +85,11 @@ if __name__ == "__main__":
         gan = GANsystem(SpectrogramGAN, params)
 
         # Set up encoder
-        # Define placeholder for variable z
         X_placeholder = tf.placeholder(tf.float32, shape=[None, *params["input_shape"]])
         z_placeholder = tf.placeholder(tf.float32, shape=[None, 100])
         encoder_output = encoder(X_placeholder, encoder_params, reuse=False, scope="encoder")
         # Set up loss
-        encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="encoder")
+        encoder_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="encoder")
         mse = tf.losses.mean_squared_error(z_placeholder, encoder_output)
         encoder_opt = tf.train.AdamOptimizer(1e-4).minimize(mse, var_list=encoder_vars)
 
@@ -99,7 +103,7 @@ if __name__ == "__main__":
         config = tf.ConfigProto(allow_soft_placement=True)
         config.gpu_options.allow_growth = True
 
-        with tf.Session() as sess:
+        with tf.Session(config=config) as sess:
             # Initialize global variables
             sess.run(tf.global_variables_initializer())
             # Load GAN
