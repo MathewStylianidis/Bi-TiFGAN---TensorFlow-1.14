@@ -86,3 +86,7 @@ We load each checkpoint from training and for each checkpoint we extract feature
 ### 7. Train post-hoc encoder
 
     python -m training.train_post_hoc_encoder --checkpoint-step=99000 --results-dir=/media/datastore/c-matsty-data/checkpoints_summaries/tifgan_spectralnorm_sc09/ --encoder-path=/media/datastore/c-matsty-data/checkpoints_summaries/post_hoc_tifgan_encoder
+
+
+### 8. Extract post hoc encoder features for a dataset
+    python -m feature_extraction.extract_posthoc_encoder_features --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data/ --checkpoint-path=/media/datastore/c-matsty-data/checkpoints_summaries/post_hoc_tifgan_encoder/commands_md64_8k_checkpoint_step_199000 --features-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/Posthoc_encoderclear_features/training.npy
