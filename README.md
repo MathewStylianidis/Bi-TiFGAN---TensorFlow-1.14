@@ -80,7 +80,9 @@ We load each checkpoint from training and for each checkpoint we extract feature
 	
 ### 6. Extract TiFGAN discriminator features for a dataset
 
-    python -m feature_extraction.extract_discriminator_features --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data/ --checkpoint-step=99000 --results-dir="/media/datastore/c-matsty-data/checkpoints_summaries/tifgan_spectralnorm_sc09/" --features-path="../saved_discriminator_features.npy" 
+In case you want to apply global average pooling on the extracted features, you can use the --pooling flag argument.
+	
+    python -m feature_extraction.extract_discriminator_features --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data/ --checkpoint-step=99000 --results-dir="/media/datastore/c-matsty-data/checkpoints_summaries/tifgan_spectralnorm_sc09/" --features-path="../saved_discriminator_features.npy" --selected-layer=4
 
 
 ### 7. Train post-hoc encoder
