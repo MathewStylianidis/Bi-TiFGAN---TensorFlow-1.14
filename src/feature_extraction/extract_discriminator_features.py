@@ -44,10 +44,15 @@ def get_arguments():
     parser.add_argument("--selected-layer", type=int, required=False, default=-1,
                         help="The index of the convolutional layer of the discriminator to use for extracting" +\
                              "the features")
+    parser.add_argument("--pooling", action='store_true')
     return parser.parse_args()
 
 
-def extract_discriminator_features(X, results_dir, checkpoint_step, name, selected_layer, batch_size=64):
+def global_average_pooling(X):
+    return np.apply_over_axes(np.mean, X, [1, 2])
+
+
+def extract_discriminator_features(X, results_dir, checkpoint_step, name, selected_layer, pooling=False, batch_size=64):
     """ Loads a discriminator and extracts features for a given dataset
 
     Args:
@@ -56,6 +61,7 @@ def extract_discriminator_features(X, results_dir, checkpoint_step, name, select
         checkpoint_step: Step of the checkpoint at which the Bi-TiF-GAN weights are saved.
         name: The name of the trained model used in the checkpoint filenames.
         selected_layer: The index of the convolutional layer of the discriminator to use for extracting the features.
+        pooling: Set to True in order to use global average pooling for the extracted features.
         batch_size: The number of images that will be processed at a time by the discriminator.
 
     Returns:
@@ -73,6 +79,8 @@ def extract_discriminator_features(X, results_dir, checkpoint_step, name, select
                 x_batch = X[i:i + batch_size]
                 feats = sess.run(tifgan._net.discr_features_real[selected_layer],
                                  feed_dict={tifgan._net.X_real: x_batch})
+                if pooling:
+                    feats = global_average_pooling(feats)
                 features.append(feats)
         features = np.vstack(features)
 
@@ -86,10 +94,11 @@ if __name__ == "__main__":
     checkpoint_step = args.checkpoint_step
     features_path = args.features_path
     selected_layer = args.selected_layer
+    pooling = args.pooling
 
     X = load_data(dataset_path)
 
-    features = extract_discriminator_features(X, results_dir, checkpoint_step, name, selected_layer)
+    features = extract_discriminator_features(X, results_dir, checkpoint_step, name, selected_layer, pooling)
     print(features.shape)
     # Save features to designated path
     feat_dir_path = os.path.dirname(os.path.abspath(features_path))
@@ -97,3 +106,4 @@ if __name__ == "__main__":
         os.makedirs(feat_dir_path)
     np.save(features_path, features)
     print("-Features saved at: {}".format(features_path))
+
