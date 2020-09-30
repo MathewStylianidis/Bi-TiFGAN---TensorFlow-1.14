@@ -71,6 +71,42 @@ def get_arguments():
     return parser.parse_args()
 
 
+def inverse_preprocessing(generated_spectrograms, fft_hop_size, fft_window_length, fixed_audio_len):
+    """ Inverses the preprocessing transformations converting the samples to the time-domain.
+
+    Args:
+        generated_spectrograms:
+        fft_hop_size:
+        fft_window_length:
+        L:
+
+    Returns:
+
+    """
+    reconstructed_audios = np.zeros((len(generated_spectrograms), fixed_audio_len))
+    generated_spectrograms = np.squeeze(generated_spectrograms, axis=3)
+    generated_spectrograms = np.exp(5 * (generated_spectrograms - 1))  # Undo preprocessing
+    generated_spectrograms = np.concatenate([generated_spectrograms, np.zeros_like(generated_spectrograms)[:, 0:1, :]],
+                                            axis=1)  # Fill last column of freqs with zeros
+    generated_spectrograms = np.pad(generated_spectrograms, mode='constant', pad_width=((0, 0), (0, 0), (0, 1)))
+
+    anStftWrapper = LTFATStft()
+    # Compute Tgrad and Fgrad from the generated spectrograms
+    tgrads = np.zeros_like(generated_spectrograms)
+    fgrads = np.zeros_like(generated_spectrograms)
+    gs = {'name': 'gauss', 'M': fft_window_length}
+    for index, magSpectrogram in enumerate(tqdm(generated_spectrograms)):
+        tgrads[index], fgrads[index] = ltfatpy.gabphasegrad('abs', magSpectrogram, gs, fft_hop_size)
+        logMagSpectrogram = np.log(magSpectrogram.astype(np.float64))
+        phase = pghi(logMagSpectrogram, tgrads[index], fgrads[index], fft_hop_size, fft_window_length,
+                     fixed_audio_len, tol=10)
+        reComplexStft = (np.e ** logMagSpectrogram) * np.exp(1.0j * phase)
+        reComplexStft = reComplexStft[:257, :128]
+        reconstructed_audio = anStftWrapper.inverseOneSidedStft(reComplexStft, fft_window_length, fft_hop_size)
+        reconstructed_audios[index] = reconstructed_audio
+    return reconstructed_audios
+
+
 if __name__ == "__main__":
     args = get_arguments()
     results_dir = args.results_dir
@@ -102,31 +138,11 @@ if __name__ == "__main__":
         with tf.Session() as sess:
             gan.load(sess=sess, checkpoint=checkpoint_step)
 
+            print("Generating samples...")
             X_fake = sess.run(gan._net.X_fake, feed_dict={gan._net.z: d2})
 
-            print("Generating samples")
-            generated_spectrograms = np.squeeze(X_fake)
-            generated_spectrograms = np.exp(5 * (generated_spectrograms - 1))  # Undo preprocessing
-            generated_spectrograms = np.concatenate([generated_spectrograms, np.zeros_like(generated_spectrograms)[:, 0:1, :]],
-                                               axis=1)  # Fill last column of freqs with zeros
-
-            print("Phase recovery")
-            anStftWrapper = LTFATStft()
-            # Compute Tgrad and Fgrad from the generated spectrograms
-            tgrads = np.zeros_like(generated_spectrograms)
-            fgrads = np.zeros_like(generated_spectrograms)
-            gs = {'name': 'gauss', 'M': fft_window_length}
-            clipBelow = -10
-            reconstructed_audios = np.zeros((len(generated_spectrograms), L))
-            for index, magSpectrogram in enumerate(tqdm(generated_spectrograms)):
-                tgrads[index], fgrads[index] = ltfatpy.gabphasegrad('abs', magSpectrogram, gs, fft_hop_size)
-                logMagSpectrogram = np.log(magSpectrogram.astype(np.float64))
-                phase = pghi(logMagSpectrogram, tgrads[index], fgrads[index], fft_hop_size, fft_window_length, L,
-                             tol=10)
-                reComplexStft = (np.e ** logMagSpectrogram) * np.exp(1.0j * phase)
-                reComplexStft = reComplexStft[:257, :128]
-                reconstructed_audio = anStftWrapper.inverseOneSidedStft(reComplexStft, fft_window_length, fft_hop_size)
-                reconstructed_audios[index] = reconstructed_audio
+            print("Inverting the preprocessing steps to acquire audio samples...")
+            reconstructed_audios = inverse_preprocessing(X_fake, fft_hop_size, fft_window_length, L)
 
             # Save spectrograms
             np.save(os.path.join(gen_samples_dir_path, name + "_" + str(checkpoint_step) + "_spectrograms.npy"),

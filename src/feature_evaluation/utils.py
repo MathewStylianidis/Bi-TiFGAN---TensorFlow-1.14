@@ -11,9 +11,9 @@ import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 
-from gantools.model import BiSpectrogramGAN
+from gantools.model import BiSpectrogramGAN, SpectrogramGAN, encoder
 from gantools.gansystem import GANsystem
-from hyperparams.tifgan_hyperparams import get_hyperparams
+from hyperparams.tifgan_hyperparams import get_hyperparams, get_encoder_hyperparams
 
 
 def get_avg_reconstruction_error(Z, checkpoint_tuples, epsilon=0.0, batch_size=64):
@@ -98,5 +98,54 @@ def load_data(dataset_path):
     X = np.vstack(X)[..., np.newaxis]
     return X
 
+
+def get_posthoc_encoder_spectrogram_reconstructions(X, tifgan_ckpt_path, tifgan_ckpt_step, encoder_ckpt_path, name):
+    """ Reconstructs a set of spectrograms using a TiFGAN and a post-hoc trained encoder.
+
+    Args:
+        X (np.ndarray): The dataset to reconstruct.
+        tifgan_ckpt_path (str): The path to the directory where the tifgan checkpoints and summaries are saved.
+        tifgan_ckpt_step (int): The update step of the tifgan checkpoint to use.
+        encoder_ckpt_path (str): The path to the post-hoc trained encoder checkpoint.
+        name (str): The name of the trained TiFGAN model.
+
+    Returns:
+        An np.ndarray with the reconstructed dataset X.
+    """
+    # Get hyperparameters
+    params = get_hyperparams(tifgan_ckpt_path, name, bidirectional=False)
+    batch_size = params["optimization"]["batch_size"]
+    latent_dim = params["net"]["generator"]["latent_dim"]
+    encoder_params = get_encoder_hyperparams(latent_dim, params["md"], params["bn"], params["input_shape"])
+
+    with tf.device('/gpu:0'):
+        # Set up GAN
+        gan = GANsystem(SpectrogramGAN, params)
+
+        # Set up encoder
+        X_placeholder = tf.placeholder(tf.float32, shape=[None, *params["input_shape"]])
+        encoder_output = encoder(X_placeholder, encoder_params, reuse=False, scope="encoder")
+        encoder_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="encoder")
+
+        # Create saver
+        saver = tf.train.Saver(var_list=encoder_vars)
+
+        config = tf.ConfigProto(allow_soft_placement=True)
+        config.gpu_options.allow_growth = True
+        with tf.Session(config=config) as sess:
+            # Load encoder
+            saver.restore(sess, encoder_ckpt_path)
+            # Load GAN
+            gan.load(sess=sess, checkpoint=tifgan_ckpt_step)
+
+            X_recon = []
+            for i in tqdm(range(0, len(X), batch_size)):
+                x_batch = X[i:i + batch_size]
+                z_batch = sess.run(encoder_output, feed_dict={X_placeholder: x_batch})
+                x_batch_recon = sess.run(gan._net.X_fake, feed_dict={gan._net.z: z_batch})
+                X_recon.append(x_batch_recon)
+            X_recon = np.vstack(X_recon)
+
+            return X_recon
 
 
