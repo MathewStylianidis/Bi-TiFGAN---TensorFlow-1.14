@@ -65,6 +65,87 @@ def get_avg_reconstruction_error(Z, checkpoint_tuples, epsilon=0.0, batch_size=6
     return avg_reconstruction_error
 
 
+def get_latent_reconstructions(Z, checkpoint_tuple, epsilon=0.0, batch_size=64):
+    """ Calculates the reconstructions of a set of latent variables by feeding them through the generator and encoder.
+
+    Args:
+        Z (np.ndarray): The dataset_size x latent_dimensions numpy array matrix with the latent samples to be
+            fed through the generator and the encoder to calculate the reconstruction error.
+        checkpoint_tuple (list): A tuple that contains the update step and the path to
+            the directory with the checkpoints.
+        epsilon (float): A number to be added to the latent samples before feeding them to the generator. This
+            argument can be set to small non zero values to evaluate the smoothness of the function learned by
+            the generator and the encoder. Defaults to 0.0.
+        batch_size (int): The number of latent to feed each time in parallel to the generator and encoder.
+
+    Returns:
+        A numpy array with the reconstructions of Z.
+    """
+    update_step, results_path = checkpoint_tuple
+
+    with tf.device('/gpu:0'):
+        params = get_hyperparams(results_path, "commands_md64_8k")
+        # Block print
+        sys.stdout = open(os.devnull, 'w')
+        biwgan = GANsystem(BiSpectrogramGAN, params)
+
+        with tf.Session() as sess:
+            biwgan.load(sess=sess, checkpoint=update_step)
+            # Enable print
+            sys.stdout = sys.__stdout__
+
+            z_recon = []
+            for i in range(0, len(Z), batch_size):
+                z_batch = Z[i:i + batch_size]
+                x_batch = sess.run(biwgan._net.X_fake, feed_dict={biwgan._net.z: z_batch + epsilon})
+                z_batch_hat = sess.run(biwgan._net.z_real, feed_dict={biwgan._net.X_real: x_batch})
+                z_recon.append(z_batch_hat)
+            z_recon = np.vstack(z_recon)
+
+    return z_recon
+
+
+def get_spectrogram_reconstructions(X, checkpoint_tuple, epsilon=0.0, batch_size=64):
+    """ Calculates the reconstructions of a set of spectrograms by feeding them through the encoder and generator.
+
+    Args:
+        X (np.ndarray): The dataset_size x (HxWx1) numpy array matrix with the spectrograms to be
+            fed through the generator and the encoder to calculate the reconstruction error. The dimensions
+            of the spectrograms in X (H and W) are hardcoded in the get_hyperparams function.
+        checkpoint_tuple (list): A tuple that contains the update step and the path to
+            the directory with the checkpoints.
+        epsilon (float): A number to be added to the latent samples before feeding them to the generator. This
+            argument can be set to small non zero values to evaluate the smoothness of the function learned by
+            the generator and the encoder. Defaults to 0.0.
+        batch_size (int): The number of latent to feed each time in parallel to the generator and encoder.
+
+    Returns:
+        A numpy array with the reconstructions of X.
+    """
+    update_step, results_path = checkpoint_tuple
+
+    with tf.device('/gpu:0'):
+        params = get_hyperparams(results_path, "commands_md64_8k")
+        # Block print
+        sys.stdout = open(os.devnull, 'w')
+        biwgan = GANsystem(BiSpectrogramGAN, params)
+
+        with tf.Session() as sess:
+            biwgan.load(sess=sess, checkpoint=update_step)
+            # Enable print
+            sys.stdout = sys.__stdout__
+
+            X_recon = []
+            for i in range(0, len(X), batch_size):
+                x_batch = X[i:i + batch_size]
+                z_batch = sess.run(biwgan._net.z_real, feed_dict={biwgan._net.X_real: x_batch + epsilon})
+                x_batch_hat = sess.run(biwgan._net.X_fake, feed_dict={biwgan._net.z: z_batch})
+                X_recon.append(x_batch_hat)
+            X_recon = np.vstack(X_recon)
+
+    return X_recon
+
+
 def load_data_labels(labels_path):
     """ Loads the label identifiers for all dataset samples.
 
