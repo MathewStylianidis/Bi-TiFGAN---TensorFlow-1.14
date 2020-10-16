@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
             # Save spectrograms
             np.save(os.path.join(gen_samples_dir_path, name + "_" + str(checkpoint_step) + "_spectrograms.npy"),
-                    generated_spectrograms)
+                    X_fake)
             # Save audio signals as wav files
             for index, audio in tqdm(enumerate(reconstructed_audios)):
                 path = os.path.join(gen_samples_dir_path, str(index) + "_" + name + "_" + str(checkpoint_step) + ".wav")
