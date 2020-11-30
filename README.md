@@ -72,11 +72,21 @@ We load each checkpoint from training and for each checkpoint we extract feature
 
 1. Normal reconstruction error:
 
-        python -m feature_evaluation.reconstruction_test  --checkpoint-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan-results-sc09-run2-gp/commands_md64_8k_checkpoints/
+        python -m feature_evaluation.latent_reconstruction_test  --checkpoint-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan-results-sc09-run2-gp/commands_md64_8k_checkpoints/
 
 2. Smoothness test (Reconstruction error with an epsilon term added to the latent samples before feeding them to the generator)
 
-        python -m feature_evaluation.reconstruction_test  --checkpoint-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan-results-sc09-run2-gp/commands_md64_8k_checkpoints/ --epsilon=1e-5
+        python -m feature_evaluation.latent_reconstruction_test  --checkpoint-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan-results-sc09-run2-gp/commands_md64_8k_checkpoints/ --epsilon=1e-5
+	
+### 5. Evaluate spectrogram mean absolute reconstruction error over time
+
+1. Normal reconstruction error:
+
+        python -m feature_evaluation.spectrogram_reconstruction_test  --checkpoint-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan-results-sc09-run2-gp/commands_md64_8k_checkpoints/ --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_test/input_data/
+
+2. Smoothness test (Reconstruction error with an epsilon term added to the latent samples before feeding them to the generator)
+
+        python -m feature_evaluation.spectrogram_reconstruction_test  --checkpoint-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan-results-sc09-run2-gp/commands_md64_8k_checkpoints/ --epsilon=1e-5 --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_test/input_data/
 	
 ### 6. Extract TiFGAN discriminator features for a dataset
 
