@@ -22,7 +22,7 @@ from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 from feature_evaluation.utils import load_data_labels
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 DEFAULT_NAME = "wgan"
@@ -31,6 +31,7 @@ DEFAULT_SAVE_DIR = os.path.join("..", "results")
 # Dataset sub-directory names
 INPUT_DATA_DIR = "input_data"
 LABELS_DIR = "labels"
+ACTORS_DIR = "actors"
 
 # Define strings that denote the different sk-learn models to be used for feature evaluation
 LOGISTIC_REGRESSION_STR = "LogisticRegression"
@@ -50,10 +51,10 @@ def get_arguments():
     Returns:
       A list of parsed arguments.
     """
-    parser = argparse.ArgumentParser(description="Preprocess dataset")
+    parser = argparse.ArgumentParser(description="Evaluate bitifgan features over time.")
     parser.add_argument("--train-path", type=str, required=True,
                         help="Path to directory where the training dataset is stored.")
-    parser.add_argument("--test-path", type=str, required=True,
+    parser.add_argument("--test-path", type=str, required=False,
                         help="Path to directory where the test dataset is stored.")
     parser.add_argument("--checkpoints-dir", type=str, required=True,
                         help="Path to the directory with all the checkpoints for the model.")
@@ -63,6 +64,9 @@ def get_arguments():
                         help="String denoting the type of sklearn model to be used for evaluating the features.")
     parser.add_argument("--model-name", type=str, required=False, default=DEFAULT_NAME,
                         help="The name of the trained model included in the checkpoint file names.")
+    parser.add_argument('--holdout-fraction', type=float, required=False,
+                        help="Fraction of actors to use for the holdout dataset to evaluate performance. Only used"
+                             "if the test-path argument is not defined.")
     return parser.parse_args()
 
 
@@ -249,30 +253,52 @@ if __name__ == "__main__":
     save_dir = args.save_dir
     evaluation_model = args.evaluation_model
     name = args.model_name
+    holdout_fraction = args.holdout_fraction
+
+    if not (args.test_path or args.holdout_fraction):
+        parser.error('Either the --test-path or the --holdout-fraction must be defined to run the evaluation.')
 
     training_input_path = os.path.join(train_path, INPUT_DATA_DIR)
     training_labels_path = os.path.join(train_path, LABELS_DIR)
+    training_actors_path = os.path.join(train_path, ACTORS_DIR)
 
-    test_input_path = os.path.join(test_path, INPUT_DATA_DIR)
-    test_labels_path = os.path.join(test_path, LABELS_DIR)
+    if test_path is not None:
+        test_input_path = os.path.join(test_path, INPUT_DATA_DIR)
+        test_labels_path = os.path.join(test_path, LABELS_DIR)
 
     print("-Getting and sorting checkpoint paths according to update step")
     checkpoint_tuples = get_checkpoint_paths(checkpoints_dir, name=name)
 
     print("-Read label meta-data for training dataset samples.")
     y_train = load_data_labels(training_labels_path)
+    a_train = load_data_labels(training_actors_path)
     label_dict = {value: index for index, value in enumerate(np.unique(y_train))}
+    actors_dict = {value: index for index, value in enumerate(np.unique(a_train))}
     y_train = np.vectorize(label_dict.get)(y_train)
+    a_train = np.vectorize(actors_dict.get)(a_train)
+
+    if test_path is not None:
+        print("-Read label meta-data for test dataset samples.")
+        y_test = load_data_labels(test_labels_path)
+        label_dict = {value: index for index, value in enumerate(np.unique(y_test))}
+        y_test = np.vectorize(label_dict.get)(y_test)
+    else:
+        print("-Determine split between training and test set.")
+        unique_actors = np.unique(a_train)
+        holdout_sample_no = int(holdout_fraction * len(unique_actors))
+        test_actors = np.random.choice(unique_actors, holdout_sample_no)
+        non_test_actors = unique_actors[~np.isin(unique_actors, test_actors)]  # Get actors not in validation actors
+        training_cond = np.isin(a_train, non_test_actors)
+        test_cond = np.isin(a_train, test_actors)
+        y_test = y_train[test_cond]
+        y_train = y_train[training_cond]
+
 
     print("-Calculating class_weights based on the training data class labels")
     class_counts = [len(y_train[y_train == i]) for i in label_dict.values()]
     class_weights = [max(class_counts) / class_count for class_count in class_counts]
-    class_weight_dict = {class_idx: class_weight for class_idx, class_weight in zip(label_dict.values(), class_weights)}
-
-    print("-Read label meta-data for test dataset samples.")
-    y_test = load_data_labels(test_labels_path)
-    label_dict = {value: index for index, value in enumerate(np.unique(y_test))}
-    y_test = np.vectorize(label_dict.get)(y_test)
+    class_weight_dict = {class_idx: class_weight for class_idx, class_weight in
+                         zip(label_dict.values(), class_weights)}
 
     train_sample_weight = [class_weight_dict[label] for label in y_train]
     test_sample_weight = [class_weight_dict[label] for label in y_test]
@@ -282,10 +308,8 @@ if __name__ == "__main__":
     avg_dataset_norms = []
     FNULL = open(os.devnull, 'w')
     random_feature_filename = str(random.getrandbits(64)) + ".npy"
-
     for update_step, checkpoint_path in tqdm(checkpoint_tuples):
         # Get the parent directory to the checkpoint directory
-        results_path = checkpoint_path.rstrip(os.path.sep)
         results_path = os.path.join(checkpoint_path, "..", "..")
 
         tqdm.write("Extracting features with model from checkpoint: {}".format(checkpoint_path))
@@ -297,13 +321,18 @@ if __name__ == "__main__":
         # Load features
         X_train = np.load(random_feature_filename)
 
-        # Run feature extraction script for the test set - removing the print outs
-        subprocess.call(" python -m feature_extraction.extract_features --dataset-path={} --checkpoint-step={} "
-                        "--features-path={} --results-dir={}"
-                        .format(test_input_path, update_step, random_feature_filename, results_path),
-                        shell=True, stdout=FNULL, stderr=subprocess.STDOUT)
-        # Load features
-        X_test = np.load(random_feature_filename)
+        if test_path is not None:
+            # Run feature extraction script for the test set - removing the print outs
+            subprocess.call(" python -m feature_extraction.extract_features --dataset-path={} --checkpoint-step={} "
+                            "--features-path={} --results-dir={}"
+                            .format(test_input_path, update_step, random_feature_filename, results_path),
+                            shell=True, stdout=FNULL, stderr=subprocess.STDOUT)
+            # Load features
+            X_test = np.load(random_feature_filename)
+        else:
+            X_test = X_train[test_cond]
+            X_train = X_train[training_cond]
+
 
         tqdm.write("Evaluating features extracted with model from checkpoint {}.".format(checkpoint_path))
         # Get norm of encoder's output normalizing the features

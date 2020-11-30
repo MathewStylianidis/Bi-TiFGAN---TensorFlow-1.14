@@ -10,14 +10,41 @@ import sys
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
+from tensorflow.python import pywrap_tensorflow
 
 from gantools.model import BiSpectrogramGAN, SpectrogramGAN, encoder
 from gantools.gansystem import GANsystem
 from hyperparams.tifgan_hyperparams import get_hyperparams, get_encoder_hyperparams
 
 
-def get_avg_reconstruction_error(Z, checkpoint_tuples, epsilon=0.0, batch_size=64):
-    """ Calculates the mean absolute reconstruction error for every checkpoint.
+def get_avg_spectrogram_reconstruction_error(X, checkpoint_tuples, image_size, epsilon=0.0, batch_size=64):
+    """ Calculates the spectrogram mean absolute reconstruction error for every checkpoint.
+
+    Args:
+        X (np.array): The dataset_size x H x W x C numpy array matrix with the spectrogram samples to be
+            fed through the encoder and the generator to calculate the reconstruction error.
+        checkpoint_tuples (list): A list of tuples where each tuple contains the update step and the path to
+            the directory with the checkpoints.
+        image_size (int): The number of pixels in each spectrogram. Equals to H * W * C.
+        epsilon (float): A number to be added to the latent samples before feeding them to the generator. This
+            argument can be set to small non zero values to evaluate the smoothness of the function learned by
+            the generator and the encoder. Defaults to 0.0.
+        batch_size (int): The number of spectrograms to feed each time in parallel to the encoder and generator.
+
+    Returns:
+        A dictionary where the key is the update step corresponding to a checkpoint and the value is the
+            mean absolute reconstruction error acquired with that checkpoint.
+    """
+    avg_reconstruction_error = {}
+    dataset_size = X.shape[0]
+    for update_step, checkpoint_path in tqdm(checkpoint_tuples):
+        X_hat = get_spectrogram_reconstructions(X, (update_step, checkpoint_path), epsilon, batch_size)
+        avg_reconstruction_error[update_step] = np.sum(np.abs(X - X_hat)) / (dataset_size * image_size)
+    return avg_reconstruction_error
+
+
+def get_avg_latent_reconstruction_error(Z, checkpoint_tuples, epsilon=0.0, batch_size=64):
+    """ Calculates the latent variable mean absolute reconstruction error for every checkpoint.
 
     Args:
         Z (np.array): The dataset_size x latent_dimensions numpy array matrix with the latent samples to be
@@ -288,3 +315,19 @@ def get_posthoc_encoder_latent_reconstructions(Z, tifgan_ckpt_path, tifgan_ckpt_
             return Z_recon
 
 
+def get_checkpoint_variables(checkpoint_path):
+    """ Returns a dict that maps each variable in the checkpoint to its value.
+
+        Args:
+            checkpoint_path: The path to the checkpoint.
+
+        Returns:
+            A dict with the variable name as a key and the the variable value (tensor value) as a value.
+    """
+    reader = pywrap_tensorflow.NewCheckpointReader(checkpoint_path)
+    var_to_shape_map = reader.get_variable_to_shape_map()
+
+    var_dict = {}
+    for key in var_to_shape_map:
+        var_dict[key] = reader.get_tensor(key)
+    return var_dict

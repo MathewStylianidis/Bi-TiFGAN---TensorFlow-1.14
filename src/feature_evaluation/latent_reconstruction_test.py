@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 import gantools.utils as gan_utils
-from feature_evaluation.utils import get_avg_reconstruction_error
+from feature_evaluation.utils import get_avg_latent_reconstruction_error
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     Z = gan_utils.sample_latent(dataset_size, latent_dim, prior="gaussian")
 
     print("-Start reconstructing latent samples for each checkpoint")
-    avg_reconstruction_error = get_avg_reconstruction_error(Z, checkpoint_tuples, epsilon)
+    avg_reconstruction_error = get_avg_latent_reconstruction_error(Z, checkpoint_tuples, epsilon)
     values = np.array(list(avg_reconstruction_error.values()))
 
     print("-Visualizing and saving result")
