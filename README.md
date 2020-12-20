@@ -101,4 +101,4 @@ In case you want to apply global average pooling on the extracted features, you 
 
 
 ### 8. Extract post hoc encoder features for a dataset
-    python -m feature_extraction.extract_posthoc_encoder_features --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data/ --checkpoint-path=/media/datastore/c-matsty-data/checkpoints_summaries/post_hoc_tifgan_encoder/commands_md64_8k_checkpoint_step_199000 --features-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/Posthoc_encoderclear_features/training.npy
+    python -m feature_extraction.extract_posthoc_encoder_features --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data/ --checkpoint-path=/media/datastore/c-matsty-data/checkpoints_summaries/post_hoc_tifgan_encoder/commands_md64_8k_checkpoint_step_199000 --features-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/Posthoc_encoder_features/training.npy
