@@ -89,16 +89,19 @@ def add_fixed_length_waveforms(X, signal, preproc_type, fixed_len, chunk_overlap
             signal chunks.
 
     Returns:
-        None.
+        The number of waveforms added to the list.
     """
     if preproc_type == "crop_or_pad":
         signal.pad_or_crop(fixed_len, in_place=True)  # Pads or crops signal on the sides
         X.append(signal.get_signal())
+        return 1
     elif preproc_type == "chunk":
         chunks = signal.chunk(chunk_length=fixed_len, chunk_overlap=chunk_overlap)
         X.extend(chunks)
+        return len(chunks)
     elif preproc_type == "high-energy":
         X.append(signal.get_higher_energy_window(window_size=fixed_len))
+        return 1
 
 
 def read_crema_dataset(dataset_path, preproc_type, fixed_len, chunk_overlap=0):
@@ -131,11 +134,11 @@ def read_crema_dataset(dataset_path, preproc_type, fixed_len, chunk_overlap=0):
             tqdm.write("Minimum amplitude requirement not met - File name: {}".format(file_name))
             continue
 
-        add_fixed_length_waveforms(X, signal, preproc_type, fixed_len, chunk_overlap)
+        no_waveforms = add_fixed_length_waveforms(X, signal, preproc_type, fixed_len, chunk_overlap)
 
         emotion_label, actor = get_cremad_file_meta_data(file_name)
-        y.append(emotion_label)
-        actors.append(actor)
+        y.extend([emotion_label for _ in range(no_waveforms)])
+        actors.extend([actor for _ in range(no_waveforms)])
 
     X = np.stack(X)
     y = np.stack(y)
@@ -163,7 +166,6 @@ def read_speech_commands_dataset(dataset_path, preproc_type, fixed_len, chunk_ov
     actors = []
     print("Converting wav files to fixed size numpy arrays and creating dataset...")
     for class_dir_name in tqdm(os.listdir(dataset_path)):
-        label = class_dir_name
         class_dir_path = os.path.join(dataset_path, class_dir_name)
         for file_name in tqdm(os.listdir(class_dir_path)):
             if not file_name.endswith('.wav'):
@@ -175,16 +177,15 @@ def read_speech_commands_dataset(dataset_path, preproc_type, fixed_len, chunk_ov
                 tqdm.write("Minimum amplitude requirement not met - File name: {}".format(file_name))
                 continue
 
-            add_fixed_length_waveforms(X, signal, preproc_type, fixed_len, chunk_overlap)
+            no_waveforms = add_fixed_length_waveforms(X, signal, preproc_type, fixed_len, chunk_overlap)
             
             actor, repeated_id = get_speech_commands_file_meta_data(file_name)
-            y.append(label)
-            actors.append(actor)
+            y.extend([emotion_label for _ in range(no_waveforms)])
+            actors.extend([actor for _ in range(no_waveforms)])
 
     X = np.stack(X)
     y = np.stack(y)
     actors = np.stack(actors)
-
     return X, y, actors, sampling_rate
 
 

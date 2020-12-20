@@ -38,7 +38,8 @@ def get_avg_spectrogram_reconstruction_error(X, checkpoint_tuples, image_size, e
     avg_reconstruction_error = {}
     dataset_size = X.shape[0]
     for update_step, checkpoint_path in tqdm(checkpoint_tuples):
-        X_hat = get_spectrogram_reconstructions(X, (update_step, checkpoint_path), epsilon, batch_size)
+        results_path = os.path.join(checkpoint_path, "..", "..")
+        X_hat = get_spectrogram_reconstructions(X, (update_step, results_path), epsilon, batch_size)
         avg_reconstruction_error[update_step] = np.sum(np.abs(X - X_hat)) / (dataset_size * image_size)
     return avg_reconstruction_error
 
@@ -184,6 +185,7 @@ def load_data_labels(labels_path):
 
     """
     files = os.listdir(labels_path)
+    files = sorted(files)
     Y = []
     for file in tqdm(files):
         if not file.endswith(".npy"):
@@ -196,6 +198,7 @@ def load_data_labels(labels_path):
 
 def load_data(dataset_path):
     files = os.listdir(dataset_path)
+    files = sorted(files)
     print("Loading data")
     X = []
     for file in tqdm(files):
