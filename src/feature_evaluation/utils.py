@@ -185,7 +185,7 @@ def load_data_labels(labels_path):
 
     """
     files = os.listdir(labels_path)
-    files = sorted(files)
+    files = sorted(files, key=lambda x: int(x.split('_')[2]))  # Sort according to id
     Y = []
     for file in tqdm(files):
         if not file.endswith(".npy"):
@@ -198,7 +198,7 @@ def load_data_labels(labels_path):
 
 def load_data(dataset_path):
     files = os.listdir(dataset_path)
-    files = sorted(files)
+    files = sorted(files, key=lambda x: int(x.split('_')[2].split('.')[0]))  # Sort according to id
     print("Loading data")
     X = []
     for file in tqdm(files):
