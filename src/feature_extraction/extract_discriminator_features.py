@@ -45,6 +45,10 @@ def get_arguments():
                         help="The index of the convolutional layer of the discriminator to use for extracting" +\
                              "the features")
     parser.add_argument("--pooling", action='store_true')
+    parser.add_argument("--distinct-save-files", type=int, required=False, default=1,
+                        help="The number of distinct files that will be used to save the extracted features. Use " + \
+                             "this if the dimensionality of the extracted features is too high to fit the dataset " + \
+                             "in memory.")
     return parser.parse_args()
 
 
@@ -95,15 +99,31 @@ if __name__ == "__main__":
     features_path = args.features_path
     selected_layer = args.selected_layer
     pooling = args.pooling
+    distinct_save_files = args.distinct_save_files
 
     X = load_data(dataset_path)
 
-    features = extract_discriminator_features(X, results_dir, checkpoint_step, name, selected_layer, pooling)
-    print(features.shape)
-    # Save features to designated path
-    feat_dir_path = os.path.dirname(os.path.abspath(features_path))
-    if not os.path.exists(feat_dir_path):
-        os.makedirs(feat_dir_path)
-    np.save(features_path, features)
-    print("-Features saved at: {}".format(features_path))
+    batch_size = int(np.ceil(len(X) / distinct_save_files))
+    batch_idx = 0
 
+    for i in tqdm(range(0, len(X), batch_size)):
+        if i + batch_size < len(X):
+            x_batch = X[i:i + batch_size]
+        else:
+            x_batch = X[i:]
+
+        features = extract_discriminator_features(x_batch, results_dir, checkpoint_step, name, selected_layer, pooling)
+
+        # Save features to designated path
+        feat_dir_path = os.path.dirname(os.path.abspath(features_path))
+        if not os.path.exists(feat_dir_path):
+            os.makedirs(feat_dir_path)
+
+        if distinct_save_files == 1:
+            np.save(features_path, features)
+            print("-Features saved at: {}".format(features_path))
+        else:
+            path = features_path[:-4] + str(batch_idx) + ".npy"
+            batch_idx += 1
+            np.save(path, features)
+            print("-Features saved at: {}".format(path))
