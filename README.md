@@ -33,7 +33,7 @@ You can download the SpeechCommands dataset from [https://ai.googleblog.com/2017
 **SpeechCommands training**:
 
 	
-	python -m training.64md_8k --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data --results-path=/media/datastore/c-matsty-data/checkpoints_summaries/<save_dir_name>
+	python -m training.64md_8k --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data --results-path=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan_normal_training_final_round
 	
 	
 ### 3. Evaluating learned features over time
@@ -42,7 +42,11 @@ We load each checkpoint from training and for each checkpoint we extract feature
 
 **SpeechCommands evaluation**:
 
-	python -m feature_evaluation.evaluate_over_time --train-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training --test-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_test --checkpoints-dir=/media/datastore/c-matsty-data/checkpoints_summaries/<save_dir_name> --evaluation-model="RandomForest"
+	python -m feature_evaluation.evaluate_over_time --train-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training --test-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_test --checkpoints-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan_normal_training_final_round/commands_md64_8k_checkpoints/ --evaluation-model="RandomForest" --save-dir="../normal_bitifgan_eval_res_rf"
+	
+An alternative is to hold out part of the training set as a validation set and not use a separate test set for evaluation. To do that you must not pass the --test-path parameter and instead you have to define the --holdout-fraction parameter which determines the percentage of actors that will be encompassed in the validation set. You can do this in the following way:
+
+	python -m feature_evaluation.evaluate_over_time --train-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training --holdout-fraction=0.1 --checkpoints-dir=/media/datastore/c-matsty-data/checkpoints_summaries/bitifgan_normal_training_final_round/commands_md64_8k_checkpoints/ --evaluation-model="RandomForest" --save-dir="../normal_bitifgan_eval_res_rf_holdoutCV"
 	
 
 	
