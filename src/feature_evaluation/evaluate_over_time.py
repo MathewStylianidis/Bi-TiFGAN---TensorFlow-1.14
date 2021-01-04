@@ -255,6 +255,8 @@ if __name__ == "__main__":
     name = args.model_name
     holdout_fraction = args.holdout_fraction
 
+    np.random.seed(0)
+
     if not (args.test_path or args.holdout_fraction):
         parser.error('Either the --test-path or the --holdout-fraction must be defined to run the evaluation.')
 
