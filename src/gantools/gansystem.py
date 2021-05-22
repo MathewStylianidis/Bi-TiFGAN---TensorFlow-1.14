@@ -85,7 +85,7 @@ class GANsystem(NNSystem):
                 self._optimize.append(tf.group(apply_opt, *self.net.constraints))
                 # Summaries
                 grad_norms = [tf.nn.l2_loss(g)*2 for g in gradients]
-                grad_norm = [tf.reduce_sum(grads) for grads in grad_norms] #TODO: Take mean
+                grad_norm = [tf.reduce_sum(grads) for grads in grad_norms] 
                 final_grad = tf.sqrt(tf.reduce_sum(grad_norm))
                 tf.summary.scalar(varsuffix+"/Gradient_Norm", final_grad, collections=["train"])
                 #if self.params['optimization'][varsuffix]['optimizer'] == 'adam':
