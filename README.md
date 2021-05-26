@@ -1,6 +1,9 @@
 
 # Bi-directional Wasserstein TiFGAN for representation learning
 
+This repository contains work done for my Master's thesis in the Machine Learning program in KTH. The work is based on the TiFGAN architecture available at https://github.com/tifgan/stftGAN. The topic of the thesis was unsupervised representation learning and the final title was "Instability of a bi-directional TiFGAN in unsupervised speech representation learning".
+
+
 ### Download data
 
 You can download the SpeechCommands dataset from [https://ai.googleblog.com/2017/08/launching-speech-commands-dataset.html](https://ai.googleblog.com/2017/08/launching-speech-commands-dataset.html) and the CREMA-D dataset from [https://github.com/CheyneyComputerScience/CREMA-D](https://github.com/CheyneyComputerScience/CREMA-D).
