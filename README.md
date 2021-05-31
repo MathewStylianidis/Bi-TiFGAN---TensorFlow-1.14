@@ -3,7 +3,7 @@
 
 This repository contains work done for my Master's thesis in the Machine Learning program in KTH. The work is based on and extends the TiFGAN architecture available at https://github.com/tifgan/stftGAN. The topic of the thesis was unsupervised representation learning and the final title was "Instability of a bi-directional TiFGAN in unsupervised speech representation learning". 
 
-The TiFGAN architecture is extended to a bi-directional Wasserstein GAN and then evaluated in representation learning. This repository contains code with instructions for the following steps:
+The TiFGAN architecture is extended to a bi-directional Wasserstein GAN and then evaluated in representation learning. This repository contains code with instructions for the following:
 * Downloading the data
 * Data pre-processing
 * BiTiFGAN training
@@ -11,10 +11,11 @@ The TiFGAN architecture is extended to a bi-directional Wasserstein GAN and then
 * Training and evaluation with baseline feature sets such as MFCC, FBANK or TiFGAN spectrogram features.
 * Generating samples using a TiFGAN or BiTiFGAN generator
 * Evaluating the latent variable or spectrogram reconstruction loss over time for BiTiFGAN
-* Extracting features using a TiFGAN discriminator
+* Extracting and evaluating features using a TiFGAN discriminator
 * Training a post-hoc encoder
-* Extracting features for a dataset using a BiTiFGAN encoder or post-hoc encoder
-
+* Extracting and evaluating features using the post-hoc encoder
+* Extracting features for BiTiFGAN encoder
+* Qualitative evaluation of BiTiFGAN encoder
 
 ### Download data
 
@@ -109,18 +110,31 @@ An alternative is to hold out part of the training set as a validation set and n
 	
 ### 6. Extract TiFGAN discriminator features for a dataset
 
-In case you want to apply global average pooling on the extracted features, you can use the --pooling flag argument.
-	
-    python -m feature_extraction.extract_discriminator_features --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data/ --checkpoint-step=99000 --results-dir="/media/datastore/c-matsty-data/checkpoints_summaries/tifgan_spectralnorm_sc09/" --features-path="../saved_discriminator_features.npy" --selected-layer=4
 
+1. Extract features:
+
+	In case you want to apply global average pooling on the extracted features, you can use the --pooling flag argument.
+  
+        python -m feature_extraction.extract_discriminator_features --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data/ --checkpoint-step=99000 --results-dir="/media/datastore/c-matsty-data/checkpoints_summaries/tifgan_spectralnorm_sc09/" --features-path="../saved_discriminator_features.npy" --selected-layer=4
+
+2. Evaluate features by running the evaluate_discriminator_features_sc09 notebook under notebooks/feature_evaluation	
+ 
 
 ### 7. Train post-hoc encoder
 
     python -m training.train_post_hoc_encoder --checkpoint-step=99000 --results-dir=/media/datastore/c-matsty-data/checkpoints_summaries/tifgan_spectralnorm_sc09/ --encoder-path=/media/datastore/c-matsty-data/checkpoints_summaries/post_hoc_tifgan_encoder
 
 
-### 8. Extract post hoc encoder features for a dataset
-    python -m feature_extraction.extract_posthoc_encoder_features --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data/ --checkpoint-path=/media/datastore/c-matsty-data/checkpoints_summaries/post_hoc_tifgan_encoder/commands_md64_8k_checkpoint_step_499000  --features-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/Posthoc_encoder_features/training.npy
+### 8. Extract and evaluate post hoc encoder features for a dataset
+
+
+1. Extract features:
+  
+        python -m feature_extraction.extract_posthoc_encoder_features --dataset-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/SpeechCommands_Preproc_2_training/input_data/ --checkpoint-path=/media/datastore/c-matsty-data/checkpoints_summaries/post_hoc_tifgan_encoder/commands_md64_8k_checkpoint_step_499000  --features-path=/media/datastore/c-matsty-data/datasets/SpeechCommands/Posthoc_encoder_features/training.npy
+
+2. Evaluate features by running the evaluate_posthoc_encoder_features notebook under notebooks/feature_evaluation
+ 
+    
     
     
 ### 9. Extract Bi-TiFGAN encoder features for a dataset
