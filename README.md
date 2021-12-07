@@ -1,7 +1,7 @@
 
 # Bi-directional Wasserstein TiFGAN for representation learning
 
-This repository contains work done for my Master's thesis in the Machine Learning program in KTH. The work is based on and extends the TiFGAN architecture available at https://github.com/tifgan/stftGAN. The topic of the thesis was unsupervised representation learning and the final title was "Instability of a bi-directional TiFGAN in unsupervised speech representation learning". 
+This repository contains work done for my Master's thesis in the Machine Learning program in KTH. The work is based on and extends the TiFGAN architecture available at https://github.com/tifgan/stftGAN. The topic of the thesis was unsupervised representation learning and the final title was ["Instability of a bi-directional TiFGAN in unsupervised speech representation learning"](http://www.diva-portal.org/smash/record.jsf?pid=diva2%3A1594701&dswid=-6412). 
 
 The TiFGAN architecture is extended to a bi-directional Wasserstein GAN and then evaluated in representation learning. This repository contains code with instructions for the following:
 1. Downloading the data
